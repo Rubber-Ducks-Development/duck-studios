@@ -55,7 +55,7 @@ version = "1.0"
 version = "0.2"
 
 [dependencies.roxmltree]
-version = "0.20"
+version = "0.21"
 
 [dependencies.ruzstd]
 version = "0.9.1"

@@ -35,6 +35,8 @@ Build into a fresh folder on Windows with PowerShell 7 and the .NET 10 SDK. Use 
 
 Upload the installer and signed manifest to those locations. Run Gitleaks on the staged package and verify the installed files, uploaded asset sizes and SHA256 before publishing. Exclude private keys, user files, PDBs and machine-specific paths. Never expose signing keys to pull-request workflows.
 
+Packaging pins .NET runtime 10.0.13. Check Microsoft's official .NET 10 release metadata before each publication and update the RuntimeVersion default when a newer serviced runtime is available. Confirm both runtime packs in DuckStudio.deps.json, including WindowsDesktop, use the requested version.
+
 New copies use the public feed without authentication. For 2.1.1 or earlier copies, select the public feed in Help > Update settings or install the new release manually. Their existing local feeds do not change when the repository becomes public. Custom feed settings take precedence.
 
 HTTP downloads and HTTPS redirects to HTTP or local files are rejected. Local signed feeds have the same manifest-size limit as HTTPS feeds.

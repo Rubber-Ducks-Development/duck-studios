@@ -9,6 +9,7 @@
 - Restricted image decoders, blocked external delegates and bounded image resources.
 - Enabled the public signed GitHub update feed for new installations and portable copies.
 - Patched the renderer's zstd dependency to address RUSTSEC-2026-0344.
+- Updated the bundled .NET and Windows Desktop runtimes to 10.0.13.
 - Added security regression tests, secret scanning, dependency checks and private reporting guidance.
 
 ## 2.1.1

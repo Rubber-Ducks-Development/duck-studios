@@ -1,0 +1,51 @@
+<Window x:Class="DuckStudio.PreviewWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Duck Studio - Clothes Preview" Icon="Assets/AppIconSource.png" Width="1160" Height="850" MinWidth="760" MinHeight="600" WindowStartupLocation="CenterOwner" Background="#356899" Foreground="#202020" UseLayoutRounding="True" SnapsToDevicePixels="True" Loaded="WindowLoaded" Closed="WindowClosed">
+  <Window.Resources>
+    <Style TargetType="Button"><Setter Property="Padding" Value="8,4"/><Setter Property="Margin" Value="0,0,0,6"/><Setter Property="MinHeight" Value="28"/></Style>
+    <Style TargetType="CheckBox"><Setter Property="Margin" Value="0,0,0,9"/></Style>
+    <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/></Style>
+    <Style TargetType="ComboBox" BasedOn="{StaticResource AnimatedComboBoxStyle}"><Setter Property="Background" Value="#F8F8F8"/><Setter Property="Foreground" Value="#202020"/><Setter Property="BorderBrush" Value="#B7B7B7"/></Style>
+  </Window.Resources>
+  <Grid>
+    <Grid.ColumnDefinitions><ColumnDefinition x:Name="MenuColumn" Width="0"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Border x:Name="MenuPane" Grid.Column="0" Background="#F2F2F2" BorderBrush="#ABABAB" BorderThickness="0,0,1,0">
+      <DockPanel Margin="10,8,10,8">
+        <Button DockPanel.Dock="Top" Content="&lt; Menu" Click="ToggleMenuClick" HorizontalAlignment="Left" Width="75"/>
+        <TextBlock DockPanel.Dock="Bottom" Text="Powered by CodeWalker" HorizontalAlignment="Center" Foreground="#666666" FontSize="11" Margin="0,7,0,3"/>
+        <TabControl x:Name="OptionTabs" Background="#F2F2F2" BorderThickness="0" Margin="0,4,0,0">
+          <TabItem Header="Options"><ScrollViewer><StackPanel Margin="4,12,8,10">
+            <TextBlock Text="Rendering" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <TextBlock Text="Render mode"/><ComboBox x:Name="RenderModeBox" SelectionChanged="DisplayOptionChanged" Margin="0,4,0,12"><ComboBoxItem Content="Textured"/><ComboBoxItem Content="Solid"/></ComboBox>
+            <TextBlock Text="Background"/><ComboBox x:Name="BackgroundBox" SelectionChanged="DisplayOptionChanged" Margin="0,4,0,12"><ComboBoxItem Content="Durty blue"/><ComboBoxItem Content="Dark studio"/><ComboBoxItem Content="Neutral gray"/></ComboBox>
+            <TextBlock Text="Light direction"/><Slider x:Name="LightSlider" Minimum="0" Maximum="360" Value="45" ValueChanged="LightDirectionChanged" Margin="0,4,0,12"/>
+            <TextBlock Text="Preview" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <CheckBox x:Name="GridBox" Content="Grid" Checked="DisplayOptionChanged" Unchecked="DisplayOptionChanged"/>
+            <CheckBox x:Name="FloorBox" Content="Show floor" Checked="DisplayOptionChanged" Unchecked="DisplayOptionChanged"/>
+            <CheckBox x:Name="AutoRotateBox" Content="Auto rotate camera" Checked="DisplayOptionChanged" Unchecked="DisplayOptionChanged"/>
+            <TextBlock Text="Fitting pose"/><ComboBox x:Name="PoseBox" SelectionChanged="PoseChanged" Margin="0,4,0,9"><ComboBoxItem Content="Standing"/><ComboBoxItem Content="Walking"/><ComboBoxItem Content="Running"/><ComboBoxItem Content="Sitting"/><ComboBoxItem Content="Aiming"/></ComboBox>
+            <CheckBox x:Name="PlayPoseBox" Content="Play fitting animation" IsChecked="True"/>
+            <TextBlock Text="Procedural rig poses. Use the FiveM companion for exact game animations and cloth physics." Foreground="#555555" FontSize="11" Margin="0,0,0,12"/>
+            <Button Content="Reset camera" Click="ResetCameraClick"/>
+            <Button Content="Save preview as PNG..." Click="SaveScreenshotClick"/>
+          </StackPanel></ScrollViewer></TabItem>
+          <TabItem Header="Ped"><ScrollViewer><StackPanel Margin="4,12,8,10">
+            <TextBlock Text="Clothes preview" FontWeight="SemiBold" Margin="0,0,0,10"/>
+            <Button Content="Show selected cloth only" Click="OnlyClothClick"/>
+            <Button x:Name="PedButton" Content="Fit on PED in 3D" Click="FitPedClick"/>
+            <TextBlock x:Name="PedStatusText" Text="A local GTA V installation is used for the full PED preview." Foreground="#555555" Margin="0,10,0,0"/>
+          </StackPanel></ScrollViewer></TabItem>
+          <TabItem Header="Models data"><ScrollViewer><StackPanel Margin="4,12,8,10"><TextBlock x:Name="ModelDataText" Text="Loading model..." LineHeight="20"/></StackPanel></ScrollViewer></TabItem>
+          <TabItem Header="Textures data"><ScrollViewer><StackPanel Margin="4,12,8,10"><TextBlock Text="Texture variation"/><ComboBox x:Name="TextureBox" SelectionChanged="TextureChanged" Margin="0,5,0,9"/><TextBlock x:Name="TextureDataText" Margin="0,0,0,12"/><Image x:Name="TextureImage" MaxHeight="210" Stretch="Uniform"/></StackPanel></ScrollViewer></TabItem>
+        </TabControl>
+      </DockPanel>
+    </Border>
+    <Grid Grid.Column="1" x:Name="PreviewSurface" ClipToBounds="True" Background="#356899">
+      <Viewport3D x:Name="PreviewViewport" ClipToBounds="True" MouseDown="ViewportMouseDown" MouseMove="ViewportMouseMove" MouseUp="ViewportMouseUp" MouseWheel="ViewportMouseWheel" SizeChanged="ViewportSizeChanged">
+        <Viewport3D.Camera><PerspectiveCamera x:Name="PreviewCamera" Position="3,2,5" LookDirection="-3,-2,-5" FieldOfView="45" NearPlaneDistance="0.01"/></Viewport3D.Camera>
+        <ModelVisual3D><ModelVisual3D.Content><Model3DGroup><AmbientLight x:Name="Ambient" Color="#A0B2BC"/><DirectionalLight x:Name="Sun" Color="#FFFFFF" Direction="-1,-1,-2"/><DirectionalLight Color="#778EA5" Direction="1,-0.5,1"/></Model3DGroup></ModelVisual3D.Content></ModelVisual3D>
+      </Viewport3D>
+      <Button x:Name="OpenMenuButton" Content="&gt; Menu" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="15" Click="ToggleMenuClick" Width="75" Panel.ZIndex="2"/>
+      <TextBlock x:Name="HintText" Text="Loading 3D preview..." HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontSize="16" IsHitTestVisible="False"/>
+      <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#8A202B36" Padding="8,5" Margin="0,0,14,12" IsHitTestVisible="False"><TextBlock Text="DRAG TO ROTATE  /  SCROLL TO ZOOM" Foreground="White" FontSize="10"/></Border>
+    </Grid>
+  </Grid>
+</Window>

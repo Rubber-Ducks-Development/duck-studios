@@ -1,0 +1,285 @@
+// Shared helpers for commands that pull renderable resources (textures,
+// drawables) out of an RPF archive or a loose file on disk.
+
+use anyhow::{Context, Result};
+use std::fs;
+use std::path::Path;
+
+use rage_formats::{parse_drawables, parse_yft, parse_ytd, rage_joaat, Drawable, DrawableEntry, DrawableKind, Fragment,
+                   YtdTexture};
+use rpf_archive::RpfEntryKind;
+
+use crate::rpf::{Archive, GtaKeys};
+
+/// Finds `name` inside `archive` (case-insensitive name or path), extracts it
+/// and returns its raw bytes. The entry must be a resource file (the kind
+/// used by .ytd/.ydr/.ydd/.yft).
+pub fn load_resource(archive: &Archive, name: &str, keys: Option<&GtaKeys>) -> Result<Vec<u8>> {
+    let name_lower = name.to_lowercase();
+    let file_ref = archive.find_file(&name_lower).with_context(|| {
+        format!(
+            "'{}' not found in archive (retail x64*.rpf keep drawables in nested .rpf files - run `rpf search <archive> <name>` to find which one, then extract it)",
+            name
+        )
+    })?;
+
+    if !matches!(archive.entry_kind(file_ref), RpfEntryKind::ResourceFile { .. }) {
+        anyhow::bail!("'{}' is not a resource file", name);
+    }
+
+    archive
+        .extract(file_ref, keys)
+        .with_context(|| format!("failed to extract '{}'", name))
+}
+
+/// Raw bytes of a resource: read straight from disk, or, when `archive` is
+/// given, looked up inside that archive by name.
+pub fn load_resource_bytes(file: &str, archive: Option<&Path>, keys: Option<&GtaKeys>) -> Result<Vec<u8>> {
+    match archive {
+        None => fs::read(file).with_context(|| format!("failed to read '{}'", file)),
+        Some(archive_path) => {
+            let archive = Archive::open(archive_path, keys)?;
+            archive.require_keys(keys)?;
+            load_resource(&archive, file, keys)
+        }
+    }
+}
+
+/// Finds `name` (by stem hash) across the game's archives in load order -
+/// base, update.rpf, then DLC packs - descending only into nested archives
+/// whose name contains `nested` (`nav` for navmesh packs, `paths` for path
+/// node packs); the last hit wins, as in the game. Returns where it was
+/// found and its bytes.
+pub fn find_in_game(game_root: &Path, name: &str, nested: &str, keys: Option<&GtaKeys>) -> Result<Option<(String, Vec<u8>)>> {
+    let (stem, ext) = name.rsplit_once('.').map_or((name, ""), |(s, e)| (s, e));
+    let hash = rage_joaat(&stem.to_lowercase());
+    let ext = format!(".{}", ext.to_lowercase());
+    let mut found = None;
+    for archive_path in crate::index::ranked_archives(game_root, keys)? {
+        let archive = match Archive::open(&archive_path, keys) {
+            Ok(a) => a,
+            Err(_) => continue,
+        };
+        if archive.require_keys(keys).is_err() { continue; }
+        let label = archive_path.display().to_string();
+        find_in_archive(&archive, &label, hash, &ext, nested, keys, 0, &mut |hit| found = Some(hit))?;
+    }
+    Ok(found)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn find_in_archive(
+    archive: &Archive, label: &str, hash: u32, ext: &str, nested: &str, keys: Option<&GtaKeys>, depth: usize,
+    on_hit: &mut dyn FnMut((String, Vec<u8>)),
+) -> Result<()> {
+    if depth > 4 { return Ok(()); }
+    let files: Vec<_> = archive.list_files().into_iter().cloned().collect();
+    for file in files {
+        let lower = file.name.to_lowercase();
+        if lower.ends_with(".rpf") {
+            if !lower.contains(nested) { continue; }
+            if let Ok(inner) = archive.open_nested(&file, keys) {
+                find_in_archive(&inner, &format!("{label}:{}", file.path), hash, ext, nested, keys, depth + 1, on_hit)?;
+            }
+            continue;
+        }
+        if !lower.ends_with(ext) { continue; }
+        let stem = lower.rsplit_once('.').map_or(lower.as_str(), |(s, _)| s);
+        if rage_joaat(stem) == hash {
+            let data = archive.extract(&file, keys)?;
+            on_hit((format!("{label}:{}", file.path), data));
+        }
+    }
+    Ok(())
+}
+
+/// The extension of a (possibly archive-relative) name, without the dot;
+/// empty when there is none.
+pub fn extension_of(name: &str) -> &str {
+    Path::new(name).extension().and_then(|e| e.to_str()).unwrap_or("")
+}
+
+/// The drawable kind `name`'s extension says it is, or an error naming the
+/// extensions that would do.
+pub fn drawable_kind_of(name: &str) -> Result<DrawableKind> {
+    DrawableKind::from_extension(extension_of(name))
+        .with_context(|| format!("'{}' is not a drawable (.ydr/.ydd/.yft)", name))
+}
+
+/// Loads and parses `name` from `archive` as a drawable of `kind` (a .ydr,
+/// .ydd or .yft) into its list of drawable entries.
+pub fn load_drawables(
+    archive: &Archive,
+    name: &str,
+    kind: DrawableKind,
+    keys: Option<&GtaKeys>,
+) -> Result<Vec<DrawableEntry>> {
+    let data = load_resource(archive, name, keys)?;
+    parse_drawables(&data, kind).with_context(|| format!("failed to parse drawable '{}'", name))
+}
+
+/// What a drawable resource loaded for rendering turned out to hold.
+pub enum Loaded {
+    /// A .ydr or .ydd: independent drawables.
+    Entries(Vec<DrawableEntry>),
+    /// A .yft, kept whole so its physics children can be placed on the body.
+    Fragment(Fragment),
+}
+
+impl Loaded {
+    /// Every drawable in the resource, whatever its role.
+    pub fn drawables(&self) -> Vec<&Drawable> {
+        match self {
+            Loaded::Entries(entries) => entries.iter().map(|entry| &entry.drawable).collect(),
+            Loaded::Fragment(fragment) => fragment
+                .drawable
+                .iter()
+                .chain(fragment.children.iter().filter_map(|child| child.drawable.as_ref()))
+                .chain(fragment.extra_drawables.iter().map(|entry| &entry.drawable))
+                .collect(),
+        }
+    }
+}
+
+/// Loads `name` (a .ydr, .ydd or .yft) from `archive` for rendering: a
+/// fragment comes back whole, anything else as its drawable entries.
+pub fn load_renderables(archive: &Archive, name: &str, keys: Option<&GtaKeys>) -> Result<Loaded> {
+    let kind = drawable_kind_of(name)?;
+    let data = load_resource(archive, name, keys)?;
+    parse_renderables(name, kind, &data)
+}
+
+/// Parses the already-extracted bytes of `name` (a .ydr, .ydd or .yft) for
+/// rendering, as [`load_renderables`] does after extracting them.
+pub fn parse_renderables(name: &str, kind: DrawableKind, data: &[u8]) -> Result<Loaded> {
+    if kind == DrawableKind::Yft {
+        let fragment = parse_yft(data).with_context(|| format!("failed to parse fragment '{}'", name))?;
+        return Ok(Loaded::Fragment(fragment));
+    }
+    let entries = parse_drawables(data, kind).with_context(|| format!("failed to parse drawable '{}'", name))?;
+    Ok(Loaded::Entries(entries))
+}
+
+/// Normalises a `--file`-style spec into the lookup name used against an
+/// archive: appends ".ytd" when the spec carries no extension of its own.
+pub fn ytd_lookup_name(spec: &str) -> String {
+    if Path::new(spec).extension().is_some() {
+        spec.to_string()
+    } else {
+        format!("{spec}.ytd")
+    }
+}
+
+/// Loads a texture dictionary either from a loose RSC7 file on disk (when
+/// `spec` names an existing file) or from `archive` (appending ".ytd" when
+/// `spec` has no extension).
+pub fn load_texture_dictionary(archive: &Archive, spec: &str, keys: Option<&GtaKeys>) -> Result<Vec<YtdTexture>> {
+    if Path::new(spec).is_file() {
+        let data = fs::read(spec).with_context(|| format!("failed to read '{}'", spec))?;
+        return parse_ytd(&data).with_context(|| format!("failed to parse YTD '{}'", spec));
+    }
+
+    let lookup_name = ytd_lookup_name(spec);
+    let data = load_resource(archive, &lookup_name, keys)?;
+    parse_ytd(&data).with_context(|| format!("failed to parse YTD '{}'", lookup_name))
+}
+
+/// Collects every texture referenced by the drawables' shader groups,
+/// deduplicated by lowercase name (first occurrence wins), in encounter order.
+pub fn embedded_textures(entries: &[DrawableEntry]) -> Vec<&YtdTexture> {
+    embedded_textures_of(entries.iter().map(|entry| &entry.drawable))
+}
+
+/// [`embedded_textures`] over any set of drawables.
+pub fn embedded_textures_of<'a>(drawables: impl IntoIterator<Item = &'a Drawable>) -> Vec<&'a YtdTexture> {
+    let mut seen = std::collections::HashSet::new();
+    let mut textures = Vec::new();
+
+    for drawable in drawables {
+        let Some(shader_group) = &drawable.shader_group else { continue };
+        for tex in &shader_group.textures {
+            if seen.insert(tex.name.to_lowercase()) {
+                textures.push(tex);
+            }
+        }
+    }
+
+    textures
+}
+
+/// Reduces a name to characters that are safe in a file name: a crafted name
+/// containing `..`/`/` must not be able to escape the destination directory.
+pub fn sanitize(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .collect();
+
+    if cleaned.is_empty() { "entry".to_string() } else { cleaned }
+}
+
+/// The file stem of a (possibly archive-relative) path: `"a/b/prop_x.ydr"` ->
+/// `"prop_x"`.
+pub fn file_stem(name: &str) -> String {
+    Path::new(name)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(name)
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_stem_strips_dirs_and_extension() {
+        assert_eq!(file_stem("a/b/prop_x.ydr"), "prop_x");
+        assert_eq!(file_stem("prop_x.ydr"), "prop_x");
+        assert_eq!(file_stem("prop_x"), "prop_x");
+        assert_eq!(file_stem("a\\b\\vehicles.ytd"), "vehicles");
+    }
+
+    #[test]
+    fn sanitize_strips_path_traversal_characters() {
+        assert_eq!(sanitize("../../etc/passwd"), "______etc_passwd");
+        assert_eq!(sanitize("prop_x"), "prop_x");
+        assert_eq!(sanitize(""), "entry");
+    }
+
+    #[test]
+    fn ytd_lookup_name_appends_extension_when_missing() {
+        assert_eq!(ytd_lookup_name("vehicles"), "vehicles.ytd");
+        assert_eq!(ytd_lookup_name("vehicles.ytd"), "vehicles.ytd");
+        assert_eq!(ytd_lookup_name("path/to/vehicles"), "path/to/vehicles.ytd");
+        assert_eq!(ytd_lookup_name("weird.name.ytd"), "weird.name.ytd");
+    }
+}
+
+/// The MLO instance entity of a .ymap (or its first entity) - the placement
+/// that turns an interior's own coordinates into world coordinates.
+pub fn mlo_placement(path: &Path) -> Result<rage_formats::YmapEntity> {
+    let data = fs::read(path).with_context(|| format!("reading {}", path.display()))?;
+    let entities = rage_formats::parse_ymap_entities(&data)?;
+    entities.iter().find(|e| e.is_mlo_instance).or(entities.first()).copied()
+        .with_context(|| format!("{} places no entities", path.display()))
+}
+
+/// Collision triangles of every .ybn in `files`, placed by `placement` when
+/// one is given; reports each file's triangle count on stderr.
+pub fn load_triangles(files: &[std::path::PathBuf], placement: Option<&rage_formats::YmapEntity>) -> Result<Vec<rage_formats::Triangle>> {
+    let mut all = Vec::new();
+    for file in files {
+        let data = fs::read(file).with_context(|| format!("reading {}", file.display()))?;
+        let ybn = rage_formats::parse_ybn(&data).with_context(|| format!("parsing {}", file.display()))?;
+        let mut tris = ybn.triangles();
+        if let Some(e) = placement {
+            for t in &mut tris {
+                for v in &mut t.vertices { *v = e.to_world(*v); }
+            }
+        }
+        eprintln!("{}: {} triangles", file.display(), tris.len());
+        all.extend(tris);
+    }
+    Ok(all)
+}

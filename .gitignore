@@ -1,0 +1,36 @@
+# Build and generated output
+**/bin/
+**/obj/
+**/target/
+.build/
+work/
+DuckStudio-Windows/
+*.pdb
+*.zip
+*.log
+
+# Local editor state
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Credentials and signing material
+.env
+.env.*
+!.env.example
+*.private.pem
+*.key
+*.pfx
+*.p12
+
+# User projects, game assets and caches
+*.weftproj
+*.dctproj
+*.ydd
+*.ytd
+*.ymt
+*.yld
+*.rpf
+settings.json
+renderer-index.txt

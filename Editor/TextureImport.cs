@@ -27,16 +27,28 @@ public static class TextureImport
     {
         lock (ImportGate)
         {
+            ImageSafety.Initialize();
             if(maxDimension<1||maxDimension>8192||(maxDimension&(maxDimension-1))!=0||fixedDimension<0||fixedDimension>8192)throw new InvalidDataException("Texture size must be a power of two from 1 to 8192.");
             var original = new FileInfo(source);
             var originalStamp = (original.LastWriteTimeUtc.Ticks, original.Length);
             using var stream = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            if(stream.Length>1073741824L)throw new InvalidDataException("Image source exceeds the 1 GB import limit.");
             using var input = new MemoryStream(); stream.CopyTo(input); input.Position = 0;
             var read = new MagickReadSettings { FrameIndex = 0, FrameCount = 1 };
             var extension = Path.GetExtension(source).ToLowerInvariant();
-            if (extension == ".tga") read.Format = MagickFormat.Tga;
-            if (extension == ".j2k") read.Format = MagickFormat.J2k;
-            if (extension == ".ico") read.Format = MagickFormat.Ico;
+            read.Format=extension switch
+            {
+                ".png"=>MagickFormat.Png,".jpg" or ".jpeg" or ".jpe" or ".jfif"=>MagickFormat.Jpeg,
+                ".psd"=>MagickFormat.Psd,".psb"=>MagickFormat.Psb,".webp"=>MagickFormat.WebP,
+                ".bmp"=>MagickFormat.Bmp,".tif" or ".tiff"=>MagickFormat.Tiff,".gif"=>MagickFormat.Gif,
+                ".tga"=>MagickFormat.Tga,".dds"=>MagickFormat.Dds,".heic"=>MagickFormat.Heic,
+                ".heif"=>MagickFormat.Heif,".avif"=>MagickFormat.Avif,".ico"=>MagickFormat.Ico,
+                ".jxl"=>MagickFormat.Jxl,".jp2"=>MagickFormat.Jp2,".j2k"=>MagickFormat.J2k,
+                ".pcx"=>MagickFormat.Pcx,".ppm"=>MagickFormat.Ppm,".pgm"=>MagickFormat.Pgm,
+                ".pbm"=>MagickFormat.Pbm,".pnm"=>MagickFormat.Pnm,".pam"=>MagickFormat.Pam,
+                ".qoi"=>MagickFormat.Qoi,".exr"=>MagickFormat.Exr,".hdr"=>MagickFormat.Hdr,
+                _=>throw new NotSupportedException("Choose a supported photo format or Photoshop image.")
+            };
             using var image = new MagickImage(input, read);
             image.AutoOrient(); image.Depth = 8;
             if (image.GetColorProfile() != null) image.TransformColorSpace(ColorProfiles.SRGB);

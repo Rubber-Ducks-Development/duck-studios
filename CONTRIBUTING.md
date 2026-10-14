@@ -21,3 +21,5 @@ For renderer changes, build with Rust and run the relevant renderer tests. Full 
 - Keep generated artifacts, user projects, GTA files, credentials and private signing keys out of commits.
 
 See `RELEASING.md` for release packaging. Keep each dependency's license and notice files intact.
+
+Run `./Security-Checks.ps1` before pushing. For vulnerabilities, use the private reporting link in [SECURITY.md](SECURITY.md) instead of posting exploit details in a public issue. New dependencies and workflow changes must pass the security checks.

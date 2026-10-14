@@ -46,8 +46,7 @@ public static class Program
     public static string Feed(string[] args)
     {
         if(Argument(args,"--feed") is { } feed)return feed;
-        var exe=Environment.ProcessPath??"";var folder=Path.GetDirectoryName(exe)??"";
-        var feedFile=Path.GetFullPath(Path.Combine(folder,"..","UpdateFeed","latest.json"));return File.Exists(feedFile)?new Uri(feedFile).AbsoluteUri:"";
+        return "https://github.com/Rubber-Ducks-Development/duck-studios/releases/latest/download/latest.json";
     }
     public static Task WaitAsync(string[] args)=>WaitForParent(args);
 }

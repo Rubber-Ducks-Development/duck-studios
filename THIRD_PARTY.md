@@ -9,4 +9,4 @@ The editor and installer are covered by the root MIT license. Dependencies retai
 | SharpDX | CodeWalker math and graphics dependencies | MIT, notice in Vendor/Licenses |
 | Magick.NET and ImageMagick | Photos, PSD/PSB and other image-format conversion | Apache 2.0 and bundled library notices in Vendor/Licenses |
 
-Detailed versions and provenance are documented in [Editor/THIRD_PARTY.md](Editor/THIRD_PARTY.md). Review redistribution terms before changing this private repository to public.
+Detailed versions and provenance are documented in [Editor/THIRD_PARTY.md](Editor/THIRD_PARTY.md). Dependencies remain subject to their own redistribution terms. The renderer vendors rpf-archive 0.10.0 under its Unlicense to upgrade ruzstd to 0.9.1; see [patch notes](Renderer/vendor/rpf-archive/DUCK-STUDIO-PATCH.md).

@@ -6,17 +6,17 @@
 
 Duck Studio is a Windows workspace for creating, previewing and exporting GTA V freemode clothing and tattoo packs. Maintained by Rubber Ducks Development.
 
-**Current version: 2.1.1. This repository and its releases are private.**
+**Current version: 2.1.2. Source and downloads are public.**
 
 [Download the latest release](https://github.com/Rubber-Ducks-Development/duck-studios/releases/latest) · [Feature guide](Editor/FEATURES-2.1.md) · [Release notes](CHANGELOG.md)
 
 ## Install or run
 
 1. Download `DuckStudioSetup.exe` from the latest release to install the app for your Windows account.
-2. For a portable copy, download `DuckStudio-Windows-2.1.1.zip`, extract it, and run `DuckStudio.exe` inside the folder. Keep its runtime files alongside the EXE.
+2. For a portable copy, download `DuckStudio-Windows-2.1.2.zip`, extract it, and run `DuckStudio.exe` inside the folder. Keep its runtime files alongside the EXE.
 3. Link your own GTA V installation in Settings to preview clothing on a full character. Asset-only previews do not require GTA V.
 
-The release includes the .NET desktop runtime. GitHub downloads require access to this private repository.
+The release includes the .NET desktop runtime. Downloads do not require a GitHub account. Use the assets on this repository's Releases page and the supplied `SHA256SUMS.txt` to verify downloads.
 
 ## Features
 
@@ -77,7 +77,11 @@ Desktop fitting animations use procedural joint rotations and real skin weights.
 
 Conservative LOD generation protects boundaries, materials and skin weights. Reduction depends on the mesh; review each generated level before applying it.
 
-Private GitHub release downloads require authentication. The desktop updater currently supports signed local/shared feeds or accessible HTTPS feeds. The packaged local feed remains enabled while the repository is private.
+New installations and portable copies check the public signed [GitHub update feed](https://github.com/Rubber-Ducks-Development/duck-studios/releases/latest/download/latest.json). The app asks before installing and verifies the pinned release signature, installer size and SHA256. HTTPS redirects cannot downgrade to HTTP. Custom signed local/shared feeds remain supported.
+
+For copies installed before 2.1.2, set Help > Update settings to `https://github.com/Rubber-Ducks-Development/duck-studios/releases/latest/download/latest.json` or install the latest release manually. Existing custom feed settings take precedence.
+
+Update to 2.1.2 before opening projects from other people. Imported projects cannot choose executable DLLs; a missing decoder must be selected locally. See [SECURITY.md](SECURITY.md) for private vulnerability reporting, security controls and review limits.
 
 ## License and dependencies
 

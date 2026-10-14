@@ -129,6 +129,11 @@ public static class ProjectIO
     public static ClothingProject Load(string path)
     {
         var project=JsonSerializer.Deserialize<ClothingProject>(File.ReadAllText(path),Json) ?? throw new InvalidDataException("Invalid project file.");
+        // Project files carry assets, never permission to load executable code.
+        // A missing bundled decoder must be selected locally through the picker.
+        project.CodeWalkerCorePath="";
+        project.CodeWalkerPath="";
+        project.GtaFolderPath="";
         var baseDir=Path.GetDirectoryName(Path.GetFullPath(path))!;
         string Resolve(string value) => string.IsNullOrWhiteSpace(value) || Path.IsPathRooted(value) ? value : Path.GetFullPath(Path.Combine(baseDir,value));
         foreach(var item in project.Items)

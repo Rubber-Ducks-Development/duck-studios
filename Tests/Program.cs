@@ -32,6 +32,7 @@ static class Program
             var release=new UpdateRelease{Version="9.0.0",InstallerUrl="https://example.invalid/setup.exe",Size=1,Sha256=new string('A',64),PublishedUtc=DateTime.UtcNow};var bytes=JsonSerializer.SerializeToUtf8Bytes(release,ProjectIO.Json);var signed=new SignedUpdate{Payload=Convert.ToBase64String(bytes),Signature=Convert.ToBase64String(rsa.SignData(bytes,HashAlgorithmName.SHA256,RSASignaturePadding.Pss))};
             Check(ApplicationUpdates.Verify(JsonSerializer.Serialize(signed),rsa.ExportSubjectPublicKeyInfoPem()).Version=="9.0.0","Release signature verifies");signed.Payload=Convert.ToBase64String(new byte[]{1,2,3});var rejected=false;try{ApplicationUpdates.Verify(JsonSerializer.Serialize(signed),rsa.ExportSubjectPublicKeyInfoPem());}catch(InvalidDataException){rejected=true;}Check(rejected,"Modified release payload is rejected");
         }
+        SecurityChecks.Run(root,Check);
         Console.WriteLine($"All {checks} source tests passed. Fixtures: {root}");
     }
     static XElement GridMesh(int count)

@@ -36,9 +36,16 @@ public static class InstallEngine
     public static string SafePath(string root,string relative)
     {
         var parts=relative.Replace('\\','/').Split('/');
-        if(string.IsNullOrWhiteSpace(relative)||Path.IsPathRooted(relative)||relative.Contains(':')||parts.Any(p=>p is "." or ".." or ""))throw new InvalidDataException("Unsafe file path in installation package.");
+        if(string.IsNullOrWhiteSpace(relative)||Path.IsPathRooted(relative)||relative.Contains(':')||parts.Any(p=>p is "." or ".." or "" || p.EndsWith('.') || p.EndsWith(' ') || p.IndexOfAny(Path.GetInvalidFileNameChars())>=0))throw new InvalidDataException("Unsafe file path in installation package.");
         var full=Path.GetFullPath(Path.Combine(root,relative));var prefix=Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar;
-        if(!full.StartsWith(prefix,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Installation file escapes its application folder.");return full;
+        if(!full.StartsWith(prefix,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Installation file escapes its application folder.");
+        for(var current=full;current!=null;current=Path.GetDirectoryName(current))
+        {
+            try{if((File.GetAttributes(current)&FileAttributes.ReparsePoint)!=0)throw new IOException("Installation files must not use symbolic links or junctions.");}
+            catch(FileNotFoundException){}
+            catch(DirectoryNotFoundException){}
+        }
+        return full;
     }
     public static InstallRecord? ReadRecord(string path)
     {
@@ -91,7 +98,7 @@ public static class InstallEngine
                 var owned=old.Files.ToHashSet(StringComparer.OrdinalIgnoreCase);owned.Add(Marker);owned.Add("update-channel.json");
                 void Preserve(string directory)
                 {
-                    foreach(var file in Directory.GetFiles(directory)){var relative=Path.GetRelativePath(target,file);if(owned.Contains(relative)||metadata.Files.ContainsKey(relative))continue;var destination=SafePath(stage,relative);Directory.CreateDirectory(Path.GetDirectoryName(destination)!);File.Copy(file,destination,false);}
+                    foreach(var file in Directory.GetFiles(directory)){var relative=Path.GetRelativePath(target,file);if(owned.Contains(relative)||metadata.Files.ContainsKey(relative))continue;if((File.GetAttributes(file)&FileAttributes.ReparsePoint)!=0)throw new IOException("Move linked files out of the application folder before updating.");var destination=SafePath(stage,relative);Directory.CreateDirectory(Path.GetDirectoryName(destination)!);File.Copy(file,destination,false);}
                     foreach(var directoryPath in Directory.GetDirectories(directory))if((File.GetAttributes(directoryPath)&FileAttributes.ReparsePoint)==0)Preserve(directoryPath);
                 }
                 Preserve(target);
@@ -136,9 +143,11 @@ public static class InstallEngine
     public static void Uninstall(string target,bool integrations=true)
     {
         target=ResolveInstallFolder(target);var record=ReadRecord(target)??throw new IOException("This folder is not an installed Duck Studio copy.");CheckRunning(target);
-        foreach(var relative in record.Files.Distinct(StringComparer.OrdinalIgnoreCase))
+        // Validate every owned path before deleting any file, including linked children.
+        var files=record.Files.Distinct(StringComparer.OrdinalIgnoreCase).Select(relative=>SafePath(target,relative)).ToArray();
+        foreach(var file in files)
         {
-            var file=SafePath(target,relative);if(File.Exists(file))File.Delete(file);
+            if(File.Exists(file))File.Delete(file);
         }
         File.Delete(Path.Combine(target,Marker));
         void EmptyDirectories(string folder)

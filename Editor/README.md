@@ -1,8 +1,8 @@
-# Duck Studio 2.1
+# Duck Studio 2.1.2
 
 Windows editor for GTA V / FiveM freemode clothing collections. See FEATURES-2.1.md for undo/redo, UV inspection, saved outfits, fitting poses, batch editing, model LODs, screenshots, revision comparison and the FiveM test companion.
 
-See `WEFT_STUDIO_PROJECT.md` for the project overview and a candid comparison with the Durty Cloth Tool documentation.
+Public source and downloads: https://github.com/Rubber-Ducks-Development/duck-studios. Read SECURITY.md in the source repository for private vulnerability reporting.
 
 ## Run
 
@@ -62,7 +62,7 @@ The 3D scene exporter now decodes the DXT3/DXT5 RGB palette with four colors for
 Automatic backups run every minute when project state or referenced files change, after open/save, and before closing. Options > Open automatic backups opens the backup root. Open a .weftproj inside a backup Project folder to restore it. The newest 20 recovery points are kept per project; asset copies are shared when unchanged. The app asks before closing and offers Save and close, Close without saving, and Cancel when changes are unsaved. Project saves use atomic replacement.
 
 
-## Duck Studio 2.1 rebrand and panel dismissal
+## Duck Studio 2.1.2 rebrand and panel dismissal
 Duck Studio uses the supplied transparent duck logo in its executable and window icons. The executable is DuckStudio.exe. Existing .weftproj files, settings, renderer caches, and automatic backups continue to work.
 Press Escape or click a non-interactive area of a temporary right-side view to return to the drawable editor. This covers the Build/Error List view, Project settings, the embedded preview, texture overlays, and secondary detail tabs. Buttons, text fields, dropdowns, scroll controls, and the 3D viewport keep their normal interaction. Escape also closes the standalone clothing preview and cancels the build/settings dialogs.
 

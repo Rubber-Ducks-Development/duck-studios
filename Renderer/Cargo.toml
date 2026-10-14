@@ -67,3 +67,6 @@ strip = false
 debug-assertions = false
 opt-level = 3
 
+
+[patch.crates-io]
+rpf-archive = { path = "vendor/rpf-archive" }

@@ -30,7 +30,7 @@ foreach($stagePath in @($appStage,$installerStage)){
         Remove-Item -LiteralPath $stageFull -Recurse -Force
     }
 }
-dotnet publish $editor -c Release -r win-x64 --self-contained true -p:NuGetAudit=false --ignore-failed-sources -o $appStage
+dotnet publish $editor -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=true -p:NuGetAuditMode=all "-warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904,NU1905" --ignore-failed-sources -o $appStage
 if($LASTEXITCODE -ne 0){throw 'Application publish failed.'}
 Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'Vendor\Runtime') -File|ForEach-Object{Copy-Item -LiteralPath $_.FullName -Destination $appStage -Force}
 $licenseStage=Join-Path $appStage 'third_party_licenses';New-Item -ItemType Directory -Path $licenseStage -Force|Out-Null
@@ -59,7 +59,7 @@ try{
     }
 }finally{$archive.Dispose()}
 $brand=Join-Path $sourceRoot 'Editor\Assets'
-dotnet publish $installerProject -c Release -r win-x64 --self-contained true -p:NuGetAudit=false --ignore-failed-sources "-p:Version=$version" "-p:BrandingRoot=$brand" "-p:PayloadPath=$payload" "-p:PayloadMetadataPath=$payloadMetadata" -o $installerStage
+dotnet publish $installerProject -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=true -p:NuGetAuditMode=all "-warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904,NU1905" --ignore-failed-sources "-p:Version=$version" "-p:BrandingRoot=$brand" "-p:PayloadPath=$payload" "-p:PayloadMetadataPath=$payloadMetadata" -o $installerStage
 if($LASTEXITCODE -ne 0){throw 'Installer publish failed.'}
 New-Item -ItemType Directory -Path $OutputFolder -Force|Out-Null
 Get-ChildItem -LiteralPath $appStage|ForEach-Object{Copy-Item -LiteralPath $_.FullName -Destination $OutputFolder -Recurse -Force}

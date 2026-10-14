@@ -79,6 +79,8 @@ Conservative LOD generation protects boundaries, materials and skin weights. Red
 
 New installations and portable copies check the public signed [GitHub update feed](https://github.com/Rubber-Ducks-Development/duck-studios/releases/latest/download/latest.json). The app asks before installing and verifies the pinned release signature, installer size and SHA256. HTTPS redirects cannot downgrade to HTTP. Custom signed local/shared feeds remain supported.
 
+**Automatic update checks are on by default.** Duck Studio checks your GitHub Releases feed when it starts and every six hours. No URL setup is needed in a new copy. You can change this in Help > Update settings; installing an update always requires confirmation.
+
 For copies installed before 2.1.2, set Help > Update settings to `https://github.com/Rubber-Ducks-Development/duck-studios/releases/latest/download/latest.json` or install the latest release manually. Existing custom feed settings take precedence.
 
 Update to 2.1.2 before opening projects from other people. Imported projects cannot choose executable DLLs; a missing decoder must be selected locally. See [SECURITY.md](SECURITY.md) for private vulnerability reporting, security controls and review limits.

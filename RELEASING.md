@@ -45,6 +45,8 @@ HTTP downloads and HTTPS redirects to HTTP or local files are rejected. Local si
 
 Checks run on startup and every six hours. A newer version asks whether to install. Not now skips automatic offers for that version; a manual check can offer it again. The app verifies the RSA-PSS signature, signed file size and SHA256 before installation, offers to save unsaved work, completes recovery, and closes.
 
+Automatic checks are enabled by default. New app and installer copies already select the public GitHub feed, so users do not need to enter the URL. Users may turn checks off or choose a different signed feed in Help > Update settings.
+
 The installer waits for the old process, verifies package files, and replaces an identified Duck Studio folder. Canceling close cancels installation. Uninstall preserves projects, history and backups.
 
 The EXEs do not carry an Authenticode publisher certificate. If adding publisher signing later, sign the installer before hashing it and creating the signed release manifest.

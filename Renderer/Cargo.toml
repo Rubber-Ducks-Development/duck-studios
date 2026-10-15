@@ -32,7 +32,7 @@ rage-render = "0.5"
 ureq = "3.4"
 json = "0.12"
 roxmltree = "0.20"
-sha2 = "0.10"
+sha2 = "0.11"
 memmap2 = "0.9.11"
 rayon = "1.12.0"
 rusqlite = { version = "0.40", features = ["bundled"] }

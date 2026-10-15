@@ -1854,7 +1854,7 @@ dependencies = [
  "rage-formats",
  "rage-render",
  "rayon",
- "roxmltree",
+ "roxmltree 0.21.1",
  "rpf-archive",
  "rusqlite",
  "sha2",
@@ -1874,7 +1874,7 @@ dependencies = [
  "flate2",
  "image",
  "json",
- "roxmltree",
+ "roxmltree 0.20.0",
  "rusty_dds",
  "texture2ddecoder",
 ]
@@ -2062,6 +2062,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 
 [[package]]
+name = "roxmltree"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "rpf-archive"
 version = "0.10.0"
 dependencies = [
@@ -2070,7 +2079,7 @@ dependencies = [
  "cipher",
  "flate2",
  "lzxd",
- "roxmltree",
+ "roxmltree 0.20.0",
  "ruzstd",
  "sha1",
 ]

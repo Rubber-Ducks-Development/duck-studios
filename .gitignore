@@ -25,6 +25,7 @@ DuckStudio-Windows/
 *.p12
 
 # User projects, game assets and caches
+*.duck
 *.weftproj
 *.dctproj
 *.ydd

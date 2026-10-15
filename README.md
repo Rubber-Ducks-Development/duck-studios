@@ -85,7 +85,7 @@ ordinary project editing or asset-only previews.
 
 | Download | Use it when |
 | --- | --- |
-| `DuckStudioSetup.exe` | You want a Start menu shortcut, uninstall entry and Open With support for `.weftproj`. |
+| `DuckStudioSetup.exe` | You want a Start menu shortcut, uninstall entry and Open With support for project files. |
 | `DuckStudio-Windows-<version>.zip` | You want a portable folder you can extract and run. |
 | `SHA256SUMS.txt` | You want to compare the download's SHA256 with the published checksums. |
 
@@ -97,11 +97,13 @@ received from other people; see the [security policy](SECURITY.md).
 
 | Type | Support and limits |
 | --- | --- |
-| `.weftproj` | Native editable workspace. Exported projects retain source assets and use relative links for portability. |
+| `.duck` | Native editable workspace. Exported projects retain source assets and use relative links for portability. |
 | `.ydd` / `.ytd` | Clothing drawable dictionaries and texture dictionaries. Component and prop workflows are supported. |
 | PNG, JPG, PSD, PSB and other images | Import artwork and linked texture variations. PSD/PSB use saved composite artwork; animated or multi-page files use the first frame. See the [image guide](Editor/README.md#linked-photos-and-photoshop-textures-12). |
 | YLD and supplemental YMT | Optional source physics and metadata can accompany the build. The app does not author custom facial expressions or shader tracks. |
 | FiveM / alt:V / single-player / raw | Select the build target for the required resource or archive layout. Game/server runtime validation remains a separate step. |
+
+The current project extension is `.duck`. Older builds and workspaces used `.weftproj`.
 
 Desktop fitting uses procedural joint rotations and real skin weights, rather than
 GTA animation clips or cloth physics. Tattoo preview uses a UV approximation. Review
@@ -188,7 +190,7 @@ Two companion workspaces with a shared visual language and different production 
 
 | App | What it is for | Workspace | Source and downloads |
 | --- | --- | --- | --- |
-| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.weftproj` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) · [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
+| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.duck` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) · [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
 | **Duck Workshop** | Vehicle UVs, light patterns, warning textures, metadata and handling comparison | `.duckworkshop` | [Repository](https://github.com/Rubber-Ducks-Development/duckworkshop) · [Releases](https://github.com/Rubber-Ducks-Development/duckworkshop/releases) |
 
 **Share images, keep projects separate.** Export a texture as PNG from Studio, inspect

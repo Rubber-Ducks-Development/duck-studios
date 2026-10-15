@@ -33,7 +33,7 @@ The default export is `<output>/<collection>-project/` with exactly these three 
         <ped>_<collection>_<slot>/   Optional grouped component files
         <ped>_p_<collection>_<slot>/ Optional grouped prop files
   Project/
-    <collection>.weftproj       Open this file in Duck Studio
+    <collection>.duck           Open this file in Duck Studio
     creators.json
     weft-build.json
     README.txt
@@ -62,11 +62,11 @@ The user supplied the pixel art duck logo in `Assets/AppIconSource.png`; `Assets
 
 ## October 13 fixes
 The 3D scene exporter now decodes the DXT3/DXT5 RGB palette with four colors for both endpoint orderings, fixing black speckles and color changes. Solid PED clothing renders opaque, fixing the translucent shirt. Shader metadata preserves cutout and blended materials. Hover over a texture photo icon to inspect a thumbnail.
-Automatic backups run every minute when project state or referenced files change, after open/save, and before closing. Options > Open automatic backups opens the backup root. Open a .weftproj inside a backup Project folder to restore it. The newest 20 recovery points are kept per project; asset copies are shared when unchanged. The app asks before closing and offers Save and close, Close without saving, and Cancel when changes are unsaved. Project saves use atomic replacement.
+Automatic backups run every minute when project state or referenced files change, after open/save, and before closing. Options > Open automatic backups opens the backup root. Open a .duck inside a backup Project folder to restore it. The newest 20 recovery points are kept per project; asset copies are shared when unchanged. The app asks before closing and offers Save and close, Close without saving, and Cancel when changes are unsaved. Project saves use atomic replacement.
 
 
 ## Duck Studio 2.1.2 rebrand and panel dismissal
-Duck Studio uses the supplied transparent duck logo in its executable and window icons. The executable is DuckStudio.exe. Existing .weftproj files, settings, renderer caches, and automatic backups continue to work.
+Duck Studio uses the supplied transparent duck logo in its executable and window icons. The executable is DuckStudio.exe. The current workspace extension is .duck. Older workspaces used .weftproj. Settings, renderer caches, and automatic backups remain part of the editor workflow.
 Press Escape or click a non-interactive area of a temporary right-side view to return to the drawable editor. This covers the Build/Error List view, Project settings, the embedded preview, texture overlays, and secondary detail tabs. Buttons, text fields, dropdowns, scroll controls, and the 3D viewport keep their normal interaction. Escape also closes the standalone clothing preview and cancels the build/settings dialogs.
 
 ## Linked photos and Photoshop textures (1.2)
@@ -91,7 +91,7 @@ Build Project now selects FiveM, alt:V, single-player DLC or raw assets. The out
 
 Help > Update settings enables automatic checks on startup and every six hours. A newer signed release opens an Install update / Not now prompt. Downloads must match the signed size and SHA256; failed downloads retain the last verified installer. Installation starts only after consent and after the app completes saving/recovery and closes. Cancelling close also cancels the pending install. HTTPS and local/shared signed feeds are supported. The release folder contains UpdateFeed/latest.json for local updates; online delivery requires publishing the signed feed and installer to your chosen host. A local release feed remains linked after installation.
 
-Installer/DuckStudioSetup.exe installs for the current Windows account, creates a Start menu shortcut, adds an uninstall entry and registers Open With for .weftproj. It includes the runtime and rejects unrelated nonempty target folders. Updates keep unknown project files and a previous installation for recovery. Uninstall removes the app's recorded files and keeps user projects, history and backups. Windows publisher signing requires the maintainer's own Authenticode certificate; release-feed signing is included.
+Installer/DuckStudioSetup.exe installs for the current Windows account, creates a Start menu shortcut, adds an uninstall entry and registers Open With for project files. It includes the runtime and rejects unrelated nonempty target folders. Updates keep unknown project files and a previous installation for recovery. Uninstall removes the app's recorded files and keeps user projects, history and backups. Windows publisher signing requires the maintainer's own Authenticode certificate; release-feed signing is included.
 
 ## Studio 2 verification
 

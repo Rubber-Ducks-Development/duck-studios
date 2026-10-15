@@ -24,4 +24,4 @@ The desktop tattoo preview shows artwork on the skin UV atlas. Use the companion
 
 PSD/PSB/photo drag and drop, linked texture updates, hover previews, automatic recovery backups, prompted closing, tattoo authoring, texture optimizers, history restoration, FiveM/alt:V/single-player/raw builds and the Duck Studio branding remain available.
 
-The installer packages the updated renderer and .NET runtime. Updates continue to check automatically and ask before installation. The provided signed feed is local; online distribution requires configuring a hosted HTTPS feed. See `RELEASING.md` in the source folder.
+The installer packages the updated renderer and .NET runtime. Updates continue to check automatically and ask before installation. New copies use the public signed GitHub Releases feed; custom signed feeds remain supported. See [RELEASING.md](../RELEASING.md).

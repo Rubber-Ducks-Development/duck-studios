@@ -1,4 +1,6 @@
-# Duck Studio 2.1.2
+# Duck Studio editor guide
+
+[Project overview and downloads](../README.md) · [Feature guide](FEATURES-2.1.md) · [Release notes](../CHANGELOG.md)
 
 Windows editor for GTA V / FiveM freemode clothing collections. See FEATURES-2.1.md for undo/redo, UV inspection, saved outfits, fitting poses, batch editing, model LODs, screenshots, revision comparison and the FiveM test companion.
 
@@ -23,7 +25,8 @@ The default export is `<output>/<collection>-project/` with exactly these three 
 ```text
 <collection>-project/
   FiveM/
-    duckstudio_test/           Optional in-game clothing/outfit/tattoo test browser\n    <collection>/              Copy this folder to your server resources directory
+    duckstudio_test/           Optional in-game clothing/outfit/tattoo test browser
+    <collection>/              Copy this folder to your server resources directory
       fxmanifest.lua
       *_shop.meta
       stream/                   YDD, YTD, binary clothing YMT, creature YMT, optional YLD

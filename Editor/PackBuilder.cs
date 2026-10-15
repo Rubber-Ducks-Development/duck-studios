@@ -240,8 +240,8 @@ public static class PackBuilder
             portable.CodeWalkerCorePath="";
             portable.GtaFolderPath="";
             portable.OutputFolder=Path.Combine("..","..");
-            ProjectIO.Save(portable,Path.Combine(projectDir,p.Collection+".weftproj"));
-            File.WriteAllText(Path.Combine(projectDir,"README.txt"),$"Deployment: {BuildTargets.OutputFolder(options.Target)}/{p.Collection}. See its target README for installation steps.\nOpen {p.Collection}.weftproj in Duck Studio to edit or rebuild; Assets contains the original input files, including linked tattoo artwork.\n");
+            ProjectIO.Save(portable,Path.Combine(projectDir,p.Collection+ProjectFiles.Extension));
+            File.WriteAllText(Path.Combine(projectDir,"README.txt"),$"Deployment: {BuildTargets.OutputFolder(options.Target)}/{p.Collection}. See its target README for installation steps.\nOpen {p.Collection}{ProjectFiles.Extension} in Duck Studio to edit or rebuild; Assets contains the original input files, including linked tattoo artwork.\n");
             var backup=target+".weft-backup-"+Guid.NewGuid().ToString("N");
             if(Directory.Exists(target))Directory.Move(target,backup);
             try { Directory.Move(stage,target); } catch { if(Directory.Exists(backup))Directory.Move(backup,target);throw; }

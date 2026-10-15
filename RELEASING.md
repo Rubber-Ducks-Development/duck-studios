@@ -28,7 +28,7 @@ Build into a fresh folder on Windows with PowerShell 7 and the .NET 10 SDK. Use 
 
 ```powershell
 ./Build-Release.ps1 -SigningKeyPath 'D:/secure/duck-studio.private.pem' `
-  -InstallerUrl 'https://github.com/Rubber-Ducks-Development/duck-studios/releases/download/v2.1.2/DuckStudioSetup.exe' `
+  -InstallerUrl 'https://github.com/Rubber-Ducks-Development/duck-studios/releases/download/v2.1.3/DuckStudioSetup.exe' `
   -FeedUrl 'https://github.com/Rubber-Ducks-Development/duck-studios/releases/latest/download/latest.json' `
   -ReleaseNotes 'What changed'
 ```

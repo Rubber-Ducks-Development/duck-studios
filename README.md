@@ -13,7 +13,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20x64-0078D4?style=flat-square" alt="Platform: Windows x64">
   <img src="https://img.shields.io/badge/built%20with-.NET%2010%20%2B%20Rust-D7B974?style=flat-square" alt="Built with .NET 10 + Rust">
-  <img src="https://img.shields.io/badge/source-2.1.2-555555?style=flat-square" alt="Source version 2.1.2">
+  <img src="https://img.shields.io/badge/source-2.1.3-555555?style=flat-square" alt="Source version 2.1.3">
   <img src="https://img.shields.io/badge/license-MIT-3A3A3A?style=flat-square" alt="License: MIT; third-party notices apply">
 </p>
 
@@ -97,13 +97,18 @@ received from other people; see the [security policy](SECURITY.md).
 
 | Type | Support and limits |
 | --- | --- |
-| `.duck` | Native editable workspace. Exported projects retain source assets and use relative links for portability. |
+| `.duckproj` | Native editable workspace. Exported projects retain source assets and use relative links for portability. |
+| `.dctproj` | Durty Cloth project import through an adjacent built FiveM resource. The original file is preserved; save imported work as `.duckproj`. |
 | `.ydd` / `.ytd` | Clothing drawable dictionaries and texture dictionaries. Component and prop workflows are supported. |
 | PNG, JPG, PSD, PSB and other images | Import artwork and linked texture variations. PSD/PSB use saved composite artwork; animated or multi-page files use the first frame. See the [image guide](Editor/README.md#linked-photos-and-photoshop-textures-12). |
 | YLD and supplemental YMT | Optional source physics and metadata can accompany the build. The app does not author custom facial expressions or shader tracks. |
 | FiveM / alt:V / single-player / raw | Select the build target for the required resource or archive layout. Game/server runtime validation remains a separate step. |
 
-The current project extension is `.duck`. Older builds and workspaces used `.weftproj`.
+Studio 2.1.3 saves new projects, exports and recovery snapshots as `.duckproj`.
+Legacy `.weftproj` and `.duck` projects still open. Saving a legacy file offers a
+new `.duckproj` copy and leaves the original intact. Durty Cloth `.dctproj` import
+uses its adjacent built FiveM resource; build it in Durty Cloth Tool first. Studio
+does not write `.dctproj` files.
 
 Desktop fitting uses procedural joint rotations and real skin weights, rather than
 GTA animation clips or cloth physics. Tattoo preview uses a UV approximation. Review
@@ -190,7 +195,7 @@ Two companion workspaces with a shared visual language and different production 
 
 | App | What it is for | Workspace | Source and downloads |
 | --- | --- | --- | --- |
-| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.duck` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) · [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
+| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.duckproj` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) · [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
 | **Duck Workshop** | Vehicle UVs, light patterns, warning textures, metadata and handling comparison | `.duckworkshop` | [Repository](https://github.com/Rubber-Ducks-Development/duckworkshop) · [Releases](https://github.com/Rubber-Ducks-Development/duckworkshop/releases) |
 
 **Share images, keep projects separate.** Export a texture as PNG from Studio, inspect

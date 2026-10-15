@@ -23,7 +23,7 @@ The normal export is an unzipped `<collection>-project` folder with exactly thre
       *_shop.meta
       stream/
   Project/
-    <collection>.duck
+    <collection>.duckproj
     creators.json
     weft-build.json
     README.txt
@@ -31,7 +31,7 @@ The normal export is an unzipped `<collection>-project` folder with exactly thre
     original source files
 ```
 
-Copy `FiveM/<collection>` into the server's resources directory and add `ensure <collection>` to `server.cfg`. Open the `.duck` file to edit or rebuild the exported project. The manifest includes a Duck Studio build comment. A ZIP, when requested, contains the same three folders.
+Copy `FiveM/<collection>` into the server's resources directory and add `ensure <collection>` to `server.cfg`. Open the `.duckproj` file to edit or rebuild the exported project. The manifest includes a Duck Studio build comment. A ZIP, when requested, contains the same three folders.
 
 ## Current feature coverage
 
@@ -39,7 +39,7 @@ This comparison uses the [Durty Cloth Tool documentation index](https://docs.gta
 
 | Area | Duck Studio status |
 | --- | --- |
-| Create, save, reopen, and relocate a project | Supported with the `.duck` format and bundled relative asset paths. |
+| Create, save, reopen, and relocate a project | Supported with the `.duckproj` format and bundled relative asset paths. |
 | Freemode clothing components and props | Supported for 12 component slots and five prop anchors. |
 | FiveM export | Supported with streamed files, binary YMT, shop META, and manifest. Rebuild and optional ZIP are supported. |
 | 3D preview | Partial. Separate window, zoom, rotation, texture selection, backgrounds, and basic display options work. Full PED fitting requires a local GTA V installation. |
@@ -75,4 +75,4 @@ Duck Studio is independent software and is not affiliated with Durty Cloth Tool,
 
 ## October 13 preview and recovery update
 The 3D scene exporter now uses the correct four-color RGB palette for DXT3/DXT5 blocks regardless of endpoint ordering, fixing black speckles and color shifts. Solid PED materials render opaque, fixing the see-through default shirt. Scene exports include shader metadata so materials retain their intended alpha behavior. Hover over the image icon beside a texture to see its thumbnail.
-Automatic recovery snapshots run every minute when the project or referenced files change, after saving or opening, and before closing. Snapshots include asset copies, deduplicate unchanged content, and retain the latest 20 versions per project. Options > Open automatic backups opens the recovery location. Open a .duck inside its Project folder to restore a version. Project saves use an atomic file replacement. Closing the main app always asks for confirmation; unsaved changes offer Save and close, Close without saving, and Cancel.
+Automatic recovery snapshots run every minute when the project or referenced files change, after saving or opening, and before closing. Snapshots include asset copies, deduplicate unchanged content, and retain the latest 20 versions per project. Options > Open automatic backups opens the recovery location. Open a .duckproj inside its Project folder to restore a version. Project saves use an atomic file replacement. Closing the main app always asks for confirmation; unsaved changes offer Save and close, Close without saving, and Cancel.

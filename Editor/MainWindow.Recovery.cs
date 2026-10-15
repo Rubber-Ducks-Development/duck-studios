@@ -31,7 +31,7 @@ public partial class MainWindow
         {
             var path = await Task.Run(() => backups.Capture(snapshot, identity));
             if (path != null) { BackupStatusText.Text = "Backup " + DateTime.Now.ToString("h:mm tt"); await RecordHistoryAsync("Automatic checkpoint"); }
-            BackupStatusText.ToolTip = "Automatic backups every minute. Open Options > Open automatic backups to restore a .weftproj.";
+            BackupStatusText.ToolTip = "Automatic backups every minute. Open Options > Open automatic backups to restore a .duckproj (legacy .duck and .weftproj backups also open).";
         }
         catch (Exception ex)
         {
@@ -52,10 +52,18 @@ public partial class MainWindow
     }
     private bool SaveProject(bool saveAs = false)
     {
-        var target = saveAs ? null : projectPath;
+        var target = !saveAs && projectPath != null && ProjectFiles.IsCurrentProject(projectPath) ? projectPath : null;
         if (target == null)
         {
-            var dialog = new Microsoft.Win32.SaveFileDialog { Filter = "Duck Studio project (*.weftproj)|*.weftproj", FileName = project.Collection + ".weftproj" };
+            var suggested = projectPath == null ? project.Collection + ProjectFiles.Extension : ProjectFiles.SuggestedSavePath(projectPath);
+            var dialog = new Microsoft.Win32.SaveFileDialog { Filter = ProjectFiles.SaveFilter, DefaultExt = ProjectFiles.Extension,
+                AddExtension = true, OverwritePrompt = true, FileName = suggested };
+            dialog.FileOk += (_, e) =>
+            {
+                if (ProjectFiles.IsCurrentProject(dialog.FileName)) return;
+                e.Cancel = true;
+                MessageBox.Show(this, "Save Duck Studio projects with the .duckproj extension.", "Duck Studio", MessageBoxButton.OK, MessageBoxImage.Information);
+            };
             if (dialog.ShowDialog(this) != true) return false;
             target = dialog.FileName;
         }

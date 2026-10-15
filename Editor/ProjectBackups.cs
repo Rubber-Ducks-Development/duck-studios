@@ -63,14 +63,14 @@ public sealed class ProjectBackups(string root, int retention = 20)
         snapshot.SupplementalYmtPaths = snapshot.SupplementalYmtPaths.Select(CopyPath).ToList();
         var name = string.Concat(snapshot.Collection.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
         if (string.IsNullOrWhiteSpace(name)) name = "project";
-        var target = Path.Combine(projectFolder, $"{name}-{DateTime.Now:yyyyMMdd-HHmmss-fff}-{Guid.NewGuid().ToString("N")[..6]}.weftproj");
+        var target = Path.Combine(projectFolder, $"{name}-{DateTime.Now:yyyyMMdd-HHmmss-fff}-{Guid.NewGuid().ToString("N")[..6]}{ProjectFiles.Extension}");
         ProjectIO.Save(snapshot, target);
         // Keep the newest 20 recovery points, with shared, immutable assets.
-        foreach (var old in Directory.GetFiles(projectFolder, "*.weftproj").OrderByDescending(File.GetLastWriteTimeUtc).Skip(retention)) File.Delete(old);
-        var referenced = Directory.GetFiles(projectFolder, "*.weftproj").SelectMany(path => Sources(ProjectIO.Load(path))).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var old in ProjectFiles.EnumerateNativeProjects(projectFolder).OrderByDescending(File.GetLastWriteTimeUtc).Skip(retention)) File.Delete(old);
+        var referenced = ProjectFiles.EnumerateNativeProjects(projectFolder).SelectMany(path => Sources(ProjectIO.Load(path))).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var orphan in Directory.GetFiles(assetFolder)) if (!referenced.Contains(orphan)) File.Delete(orphan);
         var missing = sources.Where(path => !File.Exists(path)).ToList();
-        File.WriteAllText(Path.Combine(folder, "README.txt"), "Open a .weftproj in Project to restore a recovery point. Assets contains shared backup copies.\nSource project: " + identity
+        File.WriteAllText(Path.Combine(folder, "README.txt"), "Open a .duckproj (or legacy .duck / .weftproj) in Project to restore a recovery point. Assets contains shared backup copies.\nSource project: " + identity
             + (missing.Count == 0 ? "" : "\n\nThese referenced files were already missing when this backup was made:\n" + string.Join('\n', missing)));
         fingerprints[identity] = fingerprint;
         return target;

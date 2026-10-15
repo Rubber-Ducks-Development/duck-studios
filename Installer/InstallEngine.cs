@@ -137,8 +137,17 @@ public static class InstallEngine
         var shortcut=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),"Duck Studio.lnk");
         var shellType=Type.GetTypeFromProgID("WScript.Shell");if(shellType!=null){dynamic shell=Activator.CreateInstance(shellType)!;dynamic link=shell.CreateShortcut(shortcut);link.TargetPath=Path.Combine(target,"DuckStudio.exe");link.WorkingDirectory=target;link.IconLocation=Path.Combine(target,"DuckStudio.exe")+",0";link.Save();}
         using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\DuckStudio")){key.SetValue("DisplayName","Duck Studio");key.SetValue("DisplayVersion",version);key.SetValue("Publisher","Duck Studio");key.SetValue("InstallLocation",target);key.SetValue("DisplayIcon",Path.Combine(target,"DuckStudio.exe"));key.SetValue("UninstallString","\""+Path.Combine(target,"DuckStudioSetup.exe")+"\" --uninstall --install-dir \""+target+"\"");key.SetValue("NoModify",1);key.SetValue("NoRepair",1);}
-        using(var type=Registry.CurrentUser.CreateSubKey(@"Software\Classes\DuckStudio.Project")){type.SetValue("","Duck Studio project");using var icon=type.CreateSubKey("DefaultIcon");icon.SetValue("",Path.Combine(target,"DuckStudio.exe")+",0");using var command=type.CreateSubKey(@"shell\open\command");command.SetValue("","\""+Path.Combine(target,"DuckStudio.exe")+"\" \"%1\"");}
-        using(var extension=Registry.CurrentUser.CreateSubKey(@"Software\Classes\.weftproj\OpenWithProgids"))extension.SetValue("DuckStudio.Project",Array.Empty<byte>(),RegistryValueKind.None);
+        using var classes=Registry.CurrentUser.CreateSubKey(@"Software\Classes");
+        RegisterProjectFiles(classes,target);
+    }
+    public static void RegisterProjectFiles(RegistryKey classes,string target)
+    {
+        using(var type=classes.CreateSubKey("DuckStudio.Project")){type.SetValue("","Duck Studio project");using var icon=type.CreateSubKey("DefaultIcon");icon.SetValue("",Path.Combine(target,"DuckStudio.exe")+",0");using var command=type.CreateSubKey(@"shell\open\command");command.SetValue("","\""+Path.Combine(target,"DuckStudio.exe")+"\" \"%1\"");}
+        foreach(var suffix in ProjectFiles.OpenWithExtensions)
+        {
+            using var extension=classes.CreateSubKey(suffix+@"\OpenWithProgids");
+            extension.SetValue("DuckStudio.Project",Array.Empty<byte>(),RegistryValueKind.None);
+        }
     }
     public static void Uninstall(string target,bool integrations=true)
     {
@@ -158,7 +167,16 @@ public static class InstallEngine
         if(!integrations)return;
         var shortcut=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),"Duck Studio.lnk");if(File.Exists(shortcut))File.Delete(shortcut);
         Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\DuckStudio",false);
-        Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\DuckStudio.Project",false);
-        using(var extension=Registry.CurrentUser.OpenSubKey(@"Software\Classes\.weftproj\OpenWithProgids",true))extension?.DeleteValue("DuckStudio.Project",false);
+        using var classes=Registry.CurrentUser.CreateSubKey(@"Software\Classes");
+        UnregisterProjectFiles(classes);
+    }
+    public static void UnregisterProjectFiles(RegistryKey classes)
+    {
+        classes.DeleteSubKeyTree("DuckStudio.Project",false);
+        foreach(var suffix in ProjectFiles.OpenWithExtensions)
+        {
+            using var extension=classes.OpenSubKey(suffix+@"\OpenWithProgids",true);
+            extension?.DeleteValue("DuckStudio.Project",false);
+        }
     }
 }

@@ -1,5 +1,17 @@
 # Duck Studio 2.1
 
+## Project files in 2.1.3
+
+New saves, exported workspaces and automatic recovery snapshots use `.duckproj`.
+Legacy `.weftproj` and `.duck` workspaces still open. Saving one offers a new
+`.duckproj` copy and leaves the original intact. Recovery retention includes old
+and new snapshots together and preserves assets needed by retained versions.
+
+Durty Cloth `.dctproj` files remain available in Open and the Durty import command.
+This import uses the adjacent built FiveM resource; build in Durty Cloth Tool first.
+Save imported work as `.duckproj`. Studio does not write the Durty Cloth project format.
+The installer offers Open With for all four extensions and keeps other apps' defaults.
+
 ## Editor tools
 
 - **Edit > Undo / Redo:** up to 100 project editing steps, including names, deleted items, texture replacements, tattoo changes, batch edits and optimization. Asset contents are captured independently. A restored image stays linked to its original source if that source still matches the saved content; changed artwork is restored as an independent working copy. New edits clear redo. Ctrl+Z / Ctrl+Y work in the workspace; text fields retain their native text undo.

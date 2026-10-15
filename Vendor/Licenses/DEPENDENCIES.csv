@@ -106,7 +106,7 @@
 "rsqlite-vfs","0.1.1","MIT",
 "rusqlite","0.40.2","MIT","https://github.com/rusqlite/rusqlite"
 "rustix","1.1.5","Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT","https://github.com/bytecodealliance/rustix"
-"rustls","0.23.45","Apache-2.0 OR ISC OR MIT","https://github.com/rustls/rustls"
+"rustls","0.23.46","Apache-2.0 OR ISC OR MIT","https://github.com/rustls/rustls"
 "rustls-pki-types","1.15.1","MIT OR Apache-2.0","https://github.com/rustls/pki-types"
 "rustls-webpki","0.103.15","ISC","https://github.com/rustls/webpki"
 "rustversion","1.0.23","MIT OR Apache-2.0","https://github.com/dtolnay/rustversion"

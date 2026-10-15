@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.3
+
+- Use `.duckproj` for new saves, exported workspaces and automatic recovery snapshots.
+- Keep `.weftproj` and `.duck` projects readable; saving a legacy project offers a separate `.duckproj` copy.
+- Preserve Durty Cloth `.dctproj` imports through adjacent built FiveM resources, without overwriting the original project.
+- Retain legacy recovery assets and apply backup retention across all native project extensions.
+- Register Open With for current, legacy and Durty Cloth project files while preserving other apps' associations.
+- Update the bundled renderer to rustls 0.23.46 for RUSTSEC-2026-0346 through RUSTSEC-2026-0349.
+- Compare decoded signing keys so Windows PEM line endings do not block release packaging.
+- Add regression coverage for migration, portable exports, mixed backup formats and installer associations.
+
 ## 2.1.2
 
 - Made repository and release documentation match public distribution.

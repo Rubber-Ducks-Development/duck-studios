@@ -207,7 +207,7 @@ public partial class MainWindow : Window
 
     private void OpenClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog { Filter = "Clothing projects (*.weftproj;*.dctproj)|*.weftproj;*.dctproj|Duck Studio projects (*.weftproj)|*.weftproj|Durty projects (*.dctproj)|*.dctproj" };
+        var dialog = new OpenFileDialog { Filter = ProjectFiles.OpenFilter };
         if (dialog.ShowDialog() != true) return;
         try { OpenProjectPath(dialog.FileName); }
         catch (Exception ex) { ShowError(ex); }
@@ -216,10 +216,9 @@ public partial class MainWindow : Window
     private void OpenProjectPath(string path)
     {
         if (!ConfirmProjectSwitch()) return;
-        if (path.EndsWith(".dctproj", StringComparison.OrdinalIgnoreCase))
+        if (ProjectFiles.IsDurtyProject(path))
         {
-            var built = ResourceImporter.FindAdjacentBuild(path) ?? throw new FileNotFoundException("This Durty project has no adjacent built FiveM resource. Build it in Durty first, then open it here.");
-            LoadResource(built);
+            LoadResource(path, durtyProject: true);
         }
         else
         {
@@ -326,16 +325,16 @@ public partial class MainWindow : Window
     private void OpenDctClick(object sender, RoutedEventArgs e)
     {
         if (!EnsureProject()) return;
-        var dialog = new OpenFileDialog { Filter = "Durty project (*.dctproj)|*.dctproj" };
+        var dialog = new OpenFileDialog { Filter = "Durty Cloth project (*.dctproj)|*.dctproj" };
         if (dialog.ShowDialog() != true) return;
         try { OpenProjectPath(dialog.FileName); }
         catch (Exception ex) { ShowError(ex); }
     }
 
-    private void LoadResource(string path)
+    private void LoadResource(string path, bool durtyProject = false)
     {
         if (!EnsureProject()) return;
-        var importedProject = ResourceImporter.Import(path);
+        var importedProject = durtyProject ? ResourceImporter.ImportDurtyProject(path) : ResourceImporter.Import(path);
         project.Items.AddRange(importedProject.Items);
         project.SourceResourcePath = "";
         projectPath = null;

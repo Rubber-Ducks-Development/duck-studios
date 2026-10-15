@@ -17,6 +17,12 @@ public static class ResourceImporter
         return Directory.GetDirectories(dataFolder).FirstOrDefault(x => File.Exists(Path.Combine(x, "fxmanifest.lua")));
     }
 
+    public static ClothingProject ImportDurtyProject(string path)
+    {
+        var built = FindAdjacentBuild(Path.GetFullPath(path)) ?? throw new FileNotFoundException("This Durty Cloth project has no adjacent built FiveM resource. Build it in Durty Cloth Tool first, then open it here.");
+        return Import(built);
+    }
+
     public static ClothingProject Import(string resourcePath)
     {
         if (!File.Exists(Path.Combine(resourcePath, "fxmanifest.lua")))

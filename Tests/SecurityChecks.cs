@@ -28,7 +28,7 @@ static class SecurityChecks
         var svg=System.Text.Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"4\"><rect width=\"4\" height=\"4\" fill=\"red\"/></svg>");
         var blocked=false;try{using var decoded=new MagickImage(svg);}catch(MagickException){blocked=true;}
         check(blocked,"Image policy rejects script-capable SVG decoding");
-        var projectPath=Path.Combine(root,"untrusted.weftproj");
+        var projectPath=Path.Combine(root,"untrusted.duckproj");
         File.WriteAllText(projectPath,JsonSerializer.Serialize(new ClothingProject{CodeWalkerCorePath=Path.Combine(root,"attacker.dll"),CodeWalkerPath=Path.Combine(root,"attacker.exe"),GtaFolderPath="attacker-game"},ProjectIO.Json));
         var loaded=ProjectIO.Load(projectPath);
         check(loaded.CodeWalkerCorePath==""&&loaded.CodeWalkerPath==""&&loaded.GtaFolderPath=="","Imported project cannot choose executable decoder or game paths");

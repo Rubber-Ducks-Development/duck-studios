@@ -73,8 +73,11 @@ if(-not $FeedUrl){$FeedUrl=([Uri](Join-Path $feedFolder 'latest.json')).Absolute
 $rsa=[Security.Cryptography.RSA]::Create()
 try{
     $rsa.ImportFromPem([IO.File]::ReadAllText($SigningKeyPath))
-    $pinned=[IO.File]::ReadAllText((Join-Path $brand 'UpdatePublicKey.pem')).Trim()
-    if($rsa.ExportSubjectPublicKeyInfoPem().Trim() -ne $pinned){throw 'Signing key does not match the public key pinned in Duck Studio.'}
+    $pinned=[Security.Cryptography.RSA]::Create()
+    try{
+        $pinned.ImportFromPem([IO.File]::ReadAllText((Join-Path $brand 'UpdatePublicKey.pem')))
+        if([Convert]::ToBase64String($rsa.ExportSubjectPublicKeyInfo()) -ne [Convert]::ToBase64String($pinned.ExportSubjectPublicKeyInfo())){throw 'Signing key does not match the public key pinned in Duck Studio.'}
+    }finally{$pinned.Dispose()}
     $release=[ordered]@{Version=$version;InstallerUrl=$InstallerUrl;Sha256=(Get-FileHash -LiteralPath $setup).Hash;Size=(Get-Item -LiteralPath $setup).Length;Notes=$ReleaseNotes;PublishedUtc=[DateTime]::UtcNow.ToString('o')}
     $bytes=[Text.Encoding]::UTF8.GetBytes(($release|ConvertTo-Json -Compress))
     $signature=$rsa.SignData($bytes,[Security.Cryptography.HashAlgorithmName]::SHA256,[Security.Cryptography.RSASignaturePadding]::Pss)

@@ -215,11 +215,26 @@ pub struct Composed {
 }
 
 fn selected_diffuse(drawable: &Drawable, textures: &[YtdTexture]) -> Option<String> {
-    (0..drawable.shader_count() as u16)
-        .filter_map(|id| drawable.diffuse_texture_name(id))
-        .find_map(|name| textures.iter().find(|t| t.name.eq_ignore_ascii_case(name)))
-        .or_else(|| textures.iter().find(|t| t.name.to_lowercase().contains("_diff_")))
-        .or_else(|| textures.first()).map(|t| t.name.clone())
+    let diffuse: HashSet<_> = (0..drawable.shader_count() as u16)
+        .filter_map(|id| drawable.diffuse_texture_name(id)).map(str::to_ascii_lowercase).collect();
+    if let Some(exact) = textures.iter().find(|t| diffuse.contains(&t.name.to_ascii_lowercase())) {
+        return Some(exact.name.clone());
+    }
+    let auxiliary: HashSet<_> = drawable.shader_group.iter().flat_map(|g| &g.shaders)
+        .flat_map(|s| &s.parameters).filter(|p| p.name_hash != rage_joaat("DiffuseSampler"))
+        .filter_map(|p| match &p.value {
+            rage_formats::ShaderParameterValue::Texture { name, .. } => Some(name.to_ascii_lowercase()),
+            _ => None,
+        }).collect();
+    let mut candidates = textures.iter().filter(|t| {
+        let name = t.name.to_ascii_lowercase();
+        !name.trim().is_empty() && !auxiliary.contains(&name) && !name.split(['_', '-', '.', ' ']).any(|part|
+            matches!(part, "normal" | "normalmap" | "norm" | "nrm" | "bump" | "bumpmap" | "spec" | "specmap" | "specular" | "specularmap" | "roughness" | "metallic" | "ao"))
+    });
+    let selected = candidates.next()?;
+    // A renamed variation can override the diffuse sampler, but guessing among
+    // multiple color maps can silently preview the wrong design.
+    if candidates.next().is_some() { None } else { Some(selected.name.clone()) }
 }
 
 fn selected_texture<'a>(textures: &'a [YtdTexture], shader_name: Option<&str>, fallback: Option<&str>) -> Option<&'a YtdTexture> {
@@ -477,6 +492,23 @@ mod tests {
         let textures = vec![texture("normal_map", 10), texture("cloth_diff_000_a_uni", 20)];
         assert_eq!(selected_diffuse(&d, &textures).as_deref(), Some("cloth_diff_000_a_uni"));
         assert_eq!(selected_texture(&textures, Some("CLOTH_DIFF_000_A_UNI"), Some("normal_map")).unwrap().pixel_data, vec![20;4]);
+    }
+    #[test]
+    fn renamed_variation_excludes_normal_and_specular_maps() {
+        let mut d = drawable();
+        d.shader_group.as_mut().unwrap().shaders[0].parameters.push(rage_formats::ShaderParameter {
+            name_hash: rage_joaat("BumpSampler"), data_type: 0, data_pointer: 0,
+            value: rage_formats::ShaderParameterValue::Texture { name: "GravityFlow#0065_map".into(), name_hash: 0 },
+        });
+        for color in ["FF1", "CMD", "Short Sleeve PSD_Copy1", "1", "test", "Hat2_Copy1"] {
+            let textures = vec![texture("GravityFlow#0065_map", 10), texture("GravityFlow#0065_Spec", 30), texture(color, 20)];
+            let chosen = selected_diffuse(&d, &textures);
+            assert_eq!(chosen.as_deref(), Some(color));
+            let scene = Composed { name: "renamed".into(), slots: vec![], warnings: vec![], textures: vec![], drawables: vec![], rigs: HashMap::new(), texture_overrides: [(3, textures)].into_iter().collect() };
+            assert_eq!(scene.resolve_texture(3, &d, Some("cloth_diff_000_a_uni"), chosen.as_deref()).unwrap().0.pixel_data, vec![20;4]);
+        }
+        assert!(selected_diffuse(&d, &[texture("normal_map", 1), texture("cloth_spec", 2)]).is_none());
+        assert!(selected_diffuse(&d, &[texture("FF1", 1), texture("FF2", 2)]).is_none());
     }
     #[test]
     fn selected_slot_pixels_win_over_base_and_embedded_names_without_leaking() {

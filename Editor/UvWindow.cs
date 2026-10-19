@@ -51,7 +51,7 @@ public sealed class UvWindow : StudioToolWindow
         var originals=geometry.Select(g=>g.Material).ToArray();BitmapSource? texture=null;
         void Refresh()
         {
-            texture=textures.SelectedIndex>=0?CodeWalkerPreview.LoadTextureFile(asset.TexturePaths[textures.SelectedIndex],core):null;canvas.Texture=check.IsChecked==true?StudioViewport.Checker():texture;canvas.Height=canvas.Texture!=null?1024d*canvas.Texture.PixelHeight/canvas.Texture.PixelWidth:1024;canvas.Wireframe=wire.IsChecked==true;canvas.SelectedMesh=surfaces.SelectedIndex-1;
+            texture=textures.SelectedIndex>=0?CodeWalkerPreview.LoadTextureFile(asset.TexturePaths[textures.SelectedIndex],core,modelPath:asset.ModelPath):null;canvas.Texture=check.IsChecked==true?StudioViewport.Checker():texture;canvas.Height=canvas.Texture!=null?1024d*canvas.Texture.PixelHeight/canvas.Texture.PixelWidth:1024;canvas.Wireframe=wire.IsChecked==true;canvas.SelectedMesh=surfaces.SelectedIndex-1;
             for(var i=0;i<geometry.Count;i++)
             {
                 var material=texture==null?originals[i]:new DiffuseMaterial(new ImageBrush(PreviewTexture.ForMaterial(texture,PreviewTexture.AlphaMode.Opaque)){ViewportUnits=BrushMappingMode.Absolute,Viewport=new Rect(0,0,1,1),TileMode=TileMode.Tile,Stretch=Stretch.Fill});

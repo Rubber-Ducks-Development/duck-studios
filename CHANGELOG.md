@@ -2,6 +2,12 @@
 
 ## 2.1.10
 
+### Renamed clothing texture patch (same version)
+
+- Accept an unambiguous custom-named color texture as a PED variation diffuse override, including imported DCT resources with names such as FF1, CMD and Hat1.
+- Use the same selection rule in build validation, thumbnails, photo imports and 3D previews; exclude model-referenced auxiliary maps and normal/specular names rather than selecting the first YTD entry.
+- Keep unreadable or empty dictionaries blocked, and block unresolved diffuse bindings when only data maps or ambiguous color candidates remain. Preserve original YTD bytes and the previous successful build on validation failure.
+
 ### Report scrolling patch (same version)
 
 - Replace oversized build error message boxes with a bounded, resizable report supporting wheel/keyboard scrolling, horizontal scrolling, copy, save and close.

@@ -49,23 +49,64 @@ static class RealPreviewChecks
         Save((FrameworkElement)preview.Content, Path.Combine(folder, "real-texture-a.png"));
         preview.Close();
         DctPhotoWorkflow(folder, model, original, artwork, core, check);
-        BuildFailureReport(folder,model,artwork,core,check);
+        BuildDiffuseVariations(folder,model,artwork,core,check);
     }
-    static void BuildFailureReport(string folder,string model,string artwork,string core,Action<bool,string> check)
+    static void BuildDiffuseVariations(string folder,string model,string artwork,string core,Action<bool,string> check)
     {
+        var renamed=Path.Combine(folder,"renamed-diffuse.ytd");
+        var normalArtwork=Path.Combine(folder,"normal-fixture.png");
+        var pixels=Enumerable.Repeat(new byte[]{255,100,20,255},64*64).SelectMany(p=>p).ToArray();
+        var image=BitmapSource.Create(64,64,96,96,PixelFormats.Bgra32,null,pixels,64*4);
+        var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(image));using(var stream=File.Create(normalArtwork))png.Save(stream);
+        Dictionary(renamed,[("GravityFlow#0065_Bump",normalArtwork),("GravityFlow#0065_Spec",normalArtwork),("FF1",artwork)]);
+        var originalBytes=File.ReadAllBytes(renamed);
+        check(CodeWalkerPreview.VariationDiffuseName(renamed,model,core)=="FF1","Custom-named FF1 variation resolves separately from bump/specular maps");
+        var thumb=CodeWalkerPreview.LoadTextureFile(renamed,core,modelPath:model)!;
+        var thumbPixels=new byte[thumb.PixelWidth*thumb.PixelHeight*4];thumb.CopyPixels(thumbPixels,thumb.PixelWidth*4,0);
+        check(thumbPixels[2]>200&&thumbPixels[0]>130&&thumbPixels[1]<60,"Custom-named variation thumbnail displays the color artwork");
+        var asset=new ClothingAsset{Name="Renamed variation",Slot="task",ModelPath=model,TexturePaths=[renamed]};
+        var project=new ClothingProject{Name="Renamed build",Collection="renamed_build",OutputFolder=folder,CodeWalkerCorePath=core,Items=[asset]};
+        check(!ProjectValidation.Analyze(project,core).Any(f=>f.Severity=="Error"),"Valid renamed clothing diffuse no longer produces a missing-name build error");
+        PackBuilder.Build(project,folder);
+        check(Directory.GetFiles(Path.Combine(folder,"renamed_build-project"),"*.ytd",SearchOption.AllDirectories).Any(p=>File.ReadAllBytes(p).SequenceEqual(originalBytes)),"Build publishes renamed YTD bytes without rewriting user assets");
+        var preview=new PreviewWindow(asset,new AppSettings(),0);
+        Pump((Task)typeof(PreviewWindow).GetMethod("LoadAsync",Private)!.Invoke(preview,[false])!);
+        var visual=(ModelVisual3D)typeof(PreviewWindow).GetField("currentVisual",Private)!.GetValue(preview)!;
+        check(TexturePixels(visual.Content).Any(p=>p.R>200&&p.B>130&&p.G<60),"Actual 3D preview renders FF1 color pixels instead of a normal/specular map");
+        var report=PreviewDiagnostics.Report(null,asset,0);
+        check(report.Contains("FF1")&&report.Contains("selected-ytd"),"Debug report identifies the custom diffuse actually used by the 3D preview");
+        preview.Close();
+        var imported=Path.Combine(folder,"renamed-photo.ytd");
+        check(TextureImport.Convert(artwork,imported,core,model,renamed)=="FF1"&&CodeWalkerPreview.TextureNames(imported,core).Count==3,"Photo import replaces the custom diffuse while preserving normal/specular entries");
+        check(File.ReadAllBytes(renamed).SequenceEqual(originalBytes),"Validation, preview, build and photo import preserve the original renamed YTD");
         var metadata=CodeWalkerPreview.InspectModel(model,core);
-        var embedded=CodeWalkerPreview.EmbeddedTextureNames(model,core);
-        if(!metadata.DiffuseNames.Except(embedded,StringComparer.OrdinalIgnoreCase).Any())return;
-        var wrong=Path.Combine(folder,"wrong-diffuse.ytd");
-        TextureImport.Convert(artwork,wrong,core,model,textureName:"unrelated_report_fixture");
-        var asset=new ClothingAsset{Name="Report fixture",Slot="task",ModelPath=model,TexturePaths=[wrong]};
-        var project=new ClothingProject{Name="Report build",Collection="report_build",OutputFolder=folder,CodeWalkerCorePath=core,Items=[asset]};
-        BuildValidationException? error=null;
-        try{PackBuilder.Build(project,folder);}catch(BuildValidationException ex){error=ex;}
-        check(error?.Findings.Any(f=>f.Problem.Contains("missing diffuse map")&&f.Fix.Contains("unrelated_report_fixture"))==true,"Real build failure retains expected and available diffuse map names in structured findings");
-        check(!Directory.Exists(Path.Combine(folder,"report_build-project")),"Invalid diffuse dictionaries remain blocked before publishing build output");
-        var report=BuildReport.Create(project,error!);
-        check(report.Contains("wrong-diffuse.ytd")&&report.Contains(model)&&report.Contains("unrelated_report_fixture"),"Real build failure report retains file context and available texture names for support");
+        if(!metadata.DiffuseNames.Except(CodeWalkerPreview.EmbeddedTextureNames(model,core),StringComparer.OrdinalIgnoreCase).Any())return;
+        foreach(var entries in new[]{new[]{("cloth_normal",normalArtwork),("cloth_spec",normalArtwork)},new[]{("FF1",artwork),("FF2",normalArtwork)}})
+        {
+            var wrong=Path.Combine(folder,"unresolved-diffuse-"+entries[0].Item1+".ytd");Dictionary(wrong,entries);asset.TexturePaths=[wrong];
+            BuildValidationException? error=null;try{PackBuilder.Build(project,folder);}catch(BuildValidationException ex){error=ex;}
+            check(error?.Findings.Any(f=>f.Problem.Contains("cannot resolve diffuse map")&&f.Fix.Contains(entries[0].Item1))==true,"Normal-only or ambiguous dictionaries retain a useful blocking build finding");
+            var failure=BuildReport.Create(project,error!);
+            check(failure.Contains(Path.GetFileName(wrong))&&failure.Contains(model),"Unresolved diffuse report retains model and variation file context");
+            check(Directory.GetFiles(Path.Combine(folder,"renamed_build-project"),"*.ytd",SearchOption.AllDirectories).Any(p=>File.ReadAllBytes(p).SequenceEqual(originalBytes)),"Failed validation preserves the previous valid published build");
+        }
+        void Dictionary(string path,(string Name,string Image)[] entries)
+        {
+            var assembly=Assembly.LoadFrom(core);var ytdType=assembly.GetType("CodeWalker.GameFiles.YtdFile",true)!;
+            var textureType=assembly.GetType("CodeWalker.GameFiles.Texture",true)!;
+            var list=(System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(textureType))!;
+            foreach(var entry in entries)
+            {
+                var single=path+".single.ytd";TextureImport.Convert(entry.Image,single,core,model,textureName:entry.Name);
+                var file=Activator.CreateInstance(ytdType)!;ytdType.GetMethod("Load",[typeof(byte[])])!.Invoke(file,[File.ReadAllBytes(single)]);
+                var dict=ytdType.GetProperty("TextureDict")!.GetValue(file)!;
+                var textures=dict.GetType().GetProperty("Textures")!.GetValue(dict)!;
+                list.Add(((Array)textures.GetType().GetProperty("data_items")!.GetValue(textures)!).GetValue(0));File.Delete(single);
+            }
+            var result=Activator.CreateInstance(ytdType)!;var dictionary=Activator.CreateInstance(assembly.GetType("CodeWalker.GameFiles.TextureDictionary",true)!)!;
+            dictionary.GetType().GetMethod("BuildFromTextureList")!.Invoke(dictionary,[list]);ytdType.GetProperty("TextureDict")!.SetValue(result,dictionary);
+            File.WriteAllBytes(path,(byte[])ytdType.GetMethod("Save",Type.EmptyTypes)!.Invoke(result,null)!);
+        }
     }
     static void DctPhotoWorkflow(string folder, string model, string original, string artwork, string core, Action<bool,string> check)
     {

@@ -26,14 +26,20 @@ public static class ProjectValidation
             try
             {
                 var model=CodeWalkerPreview.InspectModel(item.ModelPath,core);
+                var embedded=CodeWalkerPreview.EmbeddedTextureNames(item.ModelPath,core);
+                var auxiliary=CodeWalkerPreview.AuxiliaryTextureNames(item.ModelPath,core);
                 foreach(var lod in model.Lods.Skip(1).Where(x=>x.Triangles==0))findings.Add(new("Warning",item.Id,item.Name,$"Missing {lod.Level} LOD.","Inspect the model or generate conservative LOD copies in Model optimization."));
                 if(model.Lods[0].Triangles>30000)findings.Add(new("Warning",item.Id,item.Name,$"High LOD contains {model.Lods[0].Triangles:N0} triangles.","Inspect your geometry budget and lower LODs before deploying."));
                 foreach(var path in item.TexturePaths.Where(File.Exists))
                 {
                     try
                     {
-                        var stats=CodeWalkerPreview.InspectTextures(path,core);var names=CodeWalkerPreview.TextureNames(path,core).Concat(CodeWalkerPreview.EmbeddedTextureNames(item.ModelPath,core)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                        foreach(var missing in model.DiffuseNames.Where(x=>!names.Contains(x)))findings.Add(new("Error",item.Id,item.Name,$"{Path.GetFileName(path)} is missing diffuse map '{missing}'.",$"Expected by model: {missing}. Available in this YTD or embedded in the model: {(names.Count == 0 ? "none" : string.Join(", ", names.Order(StringComparer.OrdinalIgnoreCase)))}. Replace this variation with the matching YTD or reimport its source image using the original YTD template."));
+                        var stats=CodeWalkerPreview.InspectTextures(path,core);var external=CodeWalkerPreview.TextureNames(path,core);var names=external.Concat(embedded).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                        // Clothing variations may carry a custom-named diffuse override.
+                        // An unambiguous color map satisfies every DiffuseSampler, just
+                        // as a streamed PED variation does in CodeWalker's renderer.
+                        var binding=DiffuseBinding.Select(external,model.DiffuseNames,auxiliary);
+                        if(binding==null)foreach(var missing in model.DiffuseNames.Where(x=>!names.Contains(x)))findings.Add(new("Error",item.Id,item.Name,$"{Path.GetFileName(path)} cannot resolve diffuse map '{missing}'.",$"Expected by model: {missing}. Available in this YTD or embedded in the model: {(names.Count == 0 ? "none" : string.Join(", ", names.Order(StringComparer.OrdinalIgnoreCase)))}. Attach a YTD with a matching diffuse name or one unambiguous color texture; normal/specular maps cannot be used as the color override."));
                         if(stats.LargestDimension>2048)findings.Add(new("Warning",item.Id,item.Name,$"{Path.GetFileName(path)} has a {stats.LargestDimension}px texture.","Use the texture optimizer if this resolution is unnecessary."));
                         if(stats.Textures==0)findings.Add(new("Error",item.Id,item.Name,"Empty texture dictionary: "+Path.GetFileName(path),"Replace the dictionary with a valid texture."));
                     }
@@ -53,6 +59,17 @@ public static class ProjectValidation
 }
 public static partial class CodeWalkerPreview
 {
+    public static List<string> AuxiliaryTextureNames(string path,string coreDll)
+    {
+        EnsureCore(coreDll);return MaterialTextureNames(path,false);
+    }
+
+    public static string? VariationDiffuseName(string path,string modelPath,string coreDll)
+    {
+        EnsureCore(coreDll);
+        return DiffuseBinding.Select(TextureNames(path,coreDll),DiffuseTextureNames(modelPath),MaterialTextureNames(modelPath,false));
+    }
+
     public static List<string> EmbeddedTextureNames(string path,string coreDll)
     {
         EnsureCore(coreDll);var type=core!.GetType("CodeWalker.GameFiles.YddFile",true)!;var file=Activator.CreateInstance(type)!;type.GetMethod("Load",[typeof(byte[])])!.Invoke(file,[File.ReadAllBytes(path)]);

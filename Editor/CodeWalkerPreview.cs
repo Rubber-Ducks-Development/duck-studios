@@ -185,7 +185,8 @@ public static partial class CodeWalkerPreview
         }
         var names = DiffuseTextureNames(modelPath);
         var name = !string.IsNullOrWhiteSpace(requestedName) ? requestedName! : names.FirstOrDefault(n => textures.Cast<object>().Any(t => string.Equals(Member(t, "Name")?.ToString(), n, StringComparison.OrdinalIgnoreCase)))
-            ?? names.FirstOrDefault() ?? (textures.Count > 0 ? Member(textures[0]!, "Name")?.ToString() : null)
+            ?? DiffuseBinding.Select(textures.Cast<object>().Select(t => Member(t, "Name")?.ToString() ?? ""), names, MaterialTextureNames(modelPath, false))
+            ?? names.FirstOrDefault()
             ?? throw new InvalidDataException("Could not identify the model's diffuse texture. Attach its original YTD first.");
         var imported = core.GetType("CodeWalker.Utils.DDSIO", false) ?? core.GetTypes().First(t => t.Name == "DDSIO");
         var decoded = imported.GetMethod("GetTexture", [typeof(byte[])])!.Invoke(null, [dds])
@@ -209,7 +210,9 @@ public static partial class CodeWalkerPreview
         return ((byte[])ytdType.GetMethod("Save", Type.EmptyTypes)!.Invoke(ytd, null)!, name);
     }
 
-    private static List<string> DiffuseTextureNames(string modelPath)
+    private static List<string> DiffuseTextureNames(string modelPath) => MaterialTextureNames(modelPath, true);
+
+    private static List<string> MaterialTextureNames(string modelPath, bool diffuse)
     {
         var names = new List<string>();
         if (!File.Exists(modelPath)) return names;
@@ -225,7 +228,7 @@ public static partial class CodeWalkerPreview
                 if (shader == null || Member(shader, "ParametersList") is not { } list || Member(list, "Parameters") is not Array parameters || Member(list, "Hashes") is not Array hashes) continue;
                 for (int i = 0; i < Math.Min(parameters.Length, hashes.Length); i++)
                 {
-                    if (!string.Equals(hashes.GetValue(i)?.ToString(), "diffusesampler", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(hashes.GetValue(i)?.ToString(), "diffusesampler", StringComparison.OrdinalIgnoreCase) != diffuse) continue;
                     if (parameters.GetValue(i) is { } parameter && Member(parameter, "Data") is { } data && Member(data, "Name") is string name && !string.IsNullOrWhiteSpace(name) && !names.Contains(name)) names.Add(name);
                 }
             }
@@ -325,8 +328,9 @@ public static partial class CodeWalkerPreview
         var entries = textures == null ? null : (Array?)Member(textures, "data_items");
         if (entries is not { Length: > 0 }) return null;
         var names = textureName != null ? new List<string> { textureName } : modelPath != null ? DiffuseTextureNames(modelPath) : [];
-        var texture = names.Select(name => entries.Cast<object>().FirstOrDefault(t => string.Equals(Member(t, "Name")?.ToString(), name, StringComparison.OrdinalIgnoreCase))).FirstOrDefault(t => t != null)
-            ?? entries.Cast<object>().FirstOrDefault(t => Member(t, "Usage")?.ToString()?.StartsWith("DIFFUSE", StringComparison.OrdinalIgnoreCase) == true) ?? entries.GetValue(0)!;
+        var selected = DiffuseBinding.Select(entries.Cast<object>().Select(t => Member(t, "Name")?.ToString() ?? ""), names, modelPath != null ? MaterialTextureNames(modelPath, false) : []);
+        var texture = entries.Cast<object>().FirstOrDefault(t => string.Equals(Member(t, "Name")?.ToString(), selected, StringComparison.OrdinalIgnoreCase));
+        if (texture == null) return null;
         var width = Convert.ToInt32(Member(texture, "Width"));
         var height = Convert.ToInt32(Member(texture, "Height"));
         var format = Member(texture, "Format")?.ToString();

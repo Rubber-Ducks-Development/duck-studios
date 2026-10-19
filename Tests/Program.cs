@@ -32,6 +32,11 @@ static class Program
             var release=new UpdateRelease{Version="9.0.0",InstallerUrl="https://example.invalid/setup.exe",Size=1,Sha256=new string('A',64),PublishedUtc=DateTime.UtcNow};var bytes=JsonSerializer.SerializeToUtf8Bytes(release,ProjectIO.Json);var signed=new SignedUpdate{Payload=Convert.ToBase64String(bytes),Signature=Convert.ToBase64String(rsa.SignData(bytes,HashAlgorithmName.SHA256,RSASignaturePadding.Pss))};
             Check(ApplicationUpdates.Verify(JsonSerializer.Serialize(signed),rsa.ExportSubjectPublicKeyInfoPem()).Version=="9.0.0","Release signature verifies");signed.Payload=Convert.ToBase64String(new byte[]{1,2,3});var rejected=false;try{ApplicationUpdates.Verify(JsonSerializer.Serialize(signed),rsa.ExportSubjectPublicKeyInfoPem());}catch(InvalidDataException){rejected=true;}Check(rejected,"Modified release payload is rejected");
         }
+        foreach(var name in new[]{"FF1","CMD","1","Hat2_Copy1","test","Short Sleeve PSD_Copy1"})
+            Check(DiffuseBinding.Select(["GravityFlow#0065_map","GravityFlow#0065_Spec",name],["GravityFlow#0065"],["GravityFlow#0065_map"])==name,"Renamed diffuse resolves: "+name);
+        Check(DiffuseBinding.Select(["cloth_normal","cloth_spec"],["cloth"],[])==null,"Normal/specular dictionaries cannot masquerade as diffuse overrides");
+        Check(DiffuseBinding.Select(["FF1","FF2"],["cloth"],[])==null,"Ambiguous color maps require an exact binding");
+        Check(DiffuseBinding.Select(["FF1","cloth"],["CLOTH"],[])=="cloth","Exact material binding takes precedence over other color maps");
         ProjectFileChecks.Run(root,Check);
         SecurityChecks.Run(root,Check);
         InstallerUpdateChecks.Run(root,Check);

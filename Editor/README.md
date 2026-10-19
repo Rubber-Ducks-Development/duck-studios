@@ -20,6 +20,12 @@ Open `DuckStudio-Windows/DuckStudio.exe` with the rest of that folder intact. Th
 
 Dropdowns use high-contrast colors and short opening animations. The drawable search accepts combined terms for name, position, gender, slot, model file, and texture file. A quick filter shows only findings, one gender, components, or props.
 
+Each clothing category uses one list, with male items first and female items below them. Added models, resource items and gender copies take the next position for their gender and clothing type. Select a texture and double-click its row (or choose **3D Preview Cloth**) to preview that exact variation. YTD files can be added after their models; use **Add texture** on a selected drawable for custom filenames or ambiguous matches. Dragging right rotates the model right by default. **Invert horizontal panning** is available in Project Settings and the 3D preview's Options tab, and is saved across sessions. Preview tab headers stay in place when selected.
+
+New clothing rows use a light yellow background for two seconds, then fade back to normal over 0.7 seconds. Each import or gender copy has its own timer, which continues through selection and list refreshes. No click is required.
+
+Adding clothing reveals the final new item once after the complete batch. Its category opens, and a search or filter is cleared if it would hide the addition. The clothing action buttons fit the standard pane and wrap onto another row when narrowed.
+
 The default export is `<output>/<collection>-project/` with exactly these three folders:
 
 ```text

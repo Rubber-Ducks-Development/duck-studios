@@ -32,6 +32,9 @@ public partial class MainWindow : Window
     private int previewVersion;
     private bool autoCollapsedDrawables;
     private readonly DispatcherTimer listRefreshTimer = new() { Interval = TimeSpan.FromMilliseconds(140) };
+    private readonly DispatcherTimer newItemHighlightTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
+    private DispatcherOperation? addedItemReveal;
+    private ClothingAsset? itemToReveal;
     private readonly Dictionary<string, int> textureSelections = new(StringComparer.OrdinalIgnoreCase);
     private string? lastSyncedAssetId;
     private ClothingAsset? findingsAsset;
@@ -47,6 +50,8 @@ public partial class MainWindow : Window
         findingsHeader.Children.Add(showAllFindingsButton);
         showAllFindingsButton.Click += (_, _) => { findingsAsset = null; RefreshValidation(); };
         listRefreshTimer.Tick += (_, _) => { listRefreshTimer.Stop(); RefreshList(); };
+        newItemHighlightTimer.Tick += (_, _) => { foreach (var asset in project.Items.Where(a => a.IsNew)) asset.RefreshNewHighlight(); };
+        newItemHighlightTimer.Start();
         foreach (var slot in ProjectIO.Slots) SlotBox.Items.Add(ProjectIO.SlotLabel(slot));
         SyncProject();
         SyncItem();
@@ -65,7 +70,7 @@ public partial class MainWindow : Window
         StartUpdateChecks();
     }
 
-    private void WindowClosed(object sender, EventArgs e) { backupTimer.Stop(); listRefreshTimer.Stop(); textureReloadTimer.Stop(); textureReloadClosed = true; updateCheckTimer.Stop(); ClearModel(); LaunchPendingUpdate(); }
+    private void WindowClosed(object sender, EventArgs e) { addedItemReveal?.Abort(); backupTimer.Stop(); listRefreshTimer.Stop(); newItemHighlightTimer.Stop(); textureReloadTimer.Stop(); textureReloadClosed = true; updateCheckTimer.Stop(); ClearModel(); LaunchPendingUpdate(); }
 
     private void ChangeGtaFolderClick(object sender, RoutedEventArgs e) => ChooseGtaFolder();
 
@@ -122,11 +127,11 @@ public partial class MainWindow : Window
         var query = SearchBox.Text?.Trim() ?? "";
         var tokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var quickFilter = QuickFilterBox.SelectedIndex;
-        foreach(var group in project.Items.GroupBy(x=>x.Group))
-            foreach(var item in group) item.GroupTitle=$"{group.Key} ({group.Count(x=>x.Ped=="mp_m_freemode_01")}M {group.Count(x=>x.Ped=="mp_f_freemode_01")}F)";
+        foreach(var group in project.Items.GroupBy(x => x.Group))
+            foreach(var item in group) item.GroupTitle=$"{group.Key} ({group.Count(x => x.Ped == "mp_m_freemode_01")}M {group.Count(x => x.Ped == "mp_f_freemode_01")}F)";
         var current = selected;
         refreshingList = true;
-        var visible = project.Items.Where(x => MatchesSearch(x, tokens) && MatchesQuickFilter(x, quickFilter)).OrderBy(x=>Array.IndexOf(ProjectIO.Slots,x.Slot)).ThenBy(x=>x.Drawable).ToList();
+        var visible = project.Items.Where(x => MatchesSearch(x, tokens) && MatchesQuickFilter(x, quickFilter)).OrderBy(x=>Array.IndexOf(ProjectIO.Slots,x.Slot)).ThenBy(x=>x.Ped == "mp_f_freemode_01" ? 1 : 0).ThenBy(x=>x.Drawable).ToList();
         var view = new System.Windows.Data.ListCollectionView(visible);
         view.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(ClothingAsset.GroupTitle)));
         AssetList.ItemsSource = view;
@@ -289,28 +294,40 @@ public partial class MainWindow : Window
         var files = paths.OrderBy(x=>x,StringComparer.OrdinalIgnoreCase).ToList();
         var models = files.Where(x => x.EndsWith(".ydd", StringComparison.OrdinalIgnoreCase)).ToList();
         var textures = files.Where(x => x.EndsWith(".ytd", StringComparison.OrdinalIgnoreCase)).ToList();
+        ClothingAsset? lastAdded = null;
         foreach (var path in models.Where(x=>!ProjectIO.IsAlternative(x)))
         {
             if (!ProjectIO.TryParseDrawable(path, out var slot, out var number)) continue;
             var ped = requiredPed ?? ProjectIO.InferPed(path);
             var asset = project.Items.FirstOrDefault(x => x.Ped == ped && x.Slot == slot && ProjectIO.TryParseDrawable(x.ModelPath,out var originalSlot,out var originalNumber) && originalSlot==slot && originalNumber==number && ProjectIO.SourceCollection(x.ModelPath)==ProjectIO.SourceCollection(path));
-            if (asset == null) { asset = new ClothingAsset { Name = ProjectIO.SlotLabel(slot).Split('[','(')[0].Trim(), Ped = ped, Slot = slot, Drawable = number }; project.Items.Add(asset); }
+            if (asset == null) { asset = new ClothingAsset { Name = ProjectIO.SlotLabel(slot).Split('[','(')[0].Trim(), Ped = ped, Slot = slot }; ClothingImport.Append(project.Items, asset); lastAdded = asset; }
             asset.ModelPath = path; asset.GeneratedLods=false;
             var basePath=Path.Combine(Path.GetDirectoryName(path)!,Path.GetFileNameWithoutExtension(path));
             if(File.Exists(basePath+"_1.ydd"))asset.FirstPersonPath=basePath+"_1.ydd";
             if(File.Exists(basePath+".yld"))asset.PhysicsPath=basePath+".yld";
         }
+        var unmatched = new List<string>();
+        ClothingAsset? textureTarget = null;
+        int addedTextures = 0;
         foreach (var path in textures)
         {
-            if (!ProjectIO.TryParseTexture(path, out var slot, out var number)) continue;
-            var ped = requiredPed ?? ProjectIO.InferPed(path);
-            var asset = project.Items.FirstOrDefault(x => x.Ped == ped && x.Slot == slot && ProjectIO.TryParseDrawable(x.ModelPath,out var originalSlot,out var originalNumber) && originalSlot==slot && originalNumber==number && ProjectIO.SourceCollection(x.ModelPath)==ProjectIO.SourceCollection(path));
-            if (asset != null && !asset.TexturePaths.Contains(path, StringComparer.OrdinalIgnoreCase)) asset.TexturePaths.Add(path);
+            var asset = ClothingImport.TextureTarget(project.Items, path, requiredPed, models.Count == 0 ? selected : null);
+            if (asset == null) { unmatched.Add(Path.GetFileName(path) + ": no unambiguous matching drawable. Select its drawable and use Add texture."); continue; }
+            textureTarget = asset;
+            if (asset.TexturePaths.Contains(path, StringComparer.OrdinalIgnoreCase)) continue;
+            if (asset.TexturePaths.Count >= 26) { unmatched.Add(Path.GetFileName(path) + ": drawable already has 26 variations."); continue; }
+            asset.TexturePaths.Add(path);
+            asset.NotifyTexturesChanged();
+            addedTextures++;
         }
         RefreshList();
+        if (models.Count == 0 && textureTarget != null) AssetList.SelectedItem = textureTarget;
         if (AssetList.Items.Count > 0 && AssetList.SelectedIndex < 0) AssetList.SelectedIndex = 0;
         selected = AssetList.SelectedItem as ClothingAsset; SyncItem();
-        if (models.Count == 0) MessageBox.Show("No matching drawable was imported. Select a .ydd model alongside its .ytd variations for the chosen ped.", "Duck Studio");
+        QueueAddedItemReveal(lastAdded ?? (models.Count == 0 ? textureTarget : null));
+        StatusText.Text = $"Imported {models.Count} model file(s) and {addedTextures} YTD texture(s).";
+        if (unmatched.Count > 0) MessageBox.Show(this, string.Join("\n", unmatched), "YTD import", MessageBoxButton.OK, MessageBoxImage.Information);
+        else if (models.Count == 0 && textures.Count == 0) MessageBox.Show("No YDD models or YTD textures were found.", "Duck Studio");
     }
 
     private void OpenResourceClick(object sender, RoutedEventArgs e)
@@ -335,7 +352,7 @@ public partial class MainWindow : Window
     {
         if (!EnsureProject()) return;
         var importedProject = durtyProject ? ResourceImporter.ImportDurtyProject(path) : ResourceImporter.Import(path);
-        project.Items.AddRange(importedProject.Items);
+        foreach (var asset in importedProject.Items) ClothingImport.Append(project.Items, asset);
         project.SourceResourcePath = "";
         projectPath = null;
         selected = null;
@@ -345,6 +362,37 @@ public partial class MainWindow : Window
         if (AssetList.Items.Count > 0) AssetList.SelectedIndex = 0;
         selected = AssetList.SelectedItem as ClothingAsset; SyncItem();
         WorkspaceTabs.SelectedIndex = 0;
+        QueueAddedItemReveal(importedProject.Items.LastOrDefault());
+    }
+
+    private void QueueAddedItemReveal(ClothingAsset? asset)
+    {
+        if (asset == null) return;
+        itemToReveal = asset;
+        addedItemReveal?.Abort();
+        addedItemReveal = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(RevealAddedItem));
+    }
+
+    private void RevealAddedItem()
+    {
+        addedItemReveal?.Abort();
+        addedItemReveal = null;
+        var asset = itemToReveal;
+        itemToReveal = null;
+        if (asset == null || !project.Items.Contains(asset)) return;
+        if (!AssetList.Items.Contains(asset))
+        {
+            SearchBox.Text = "";
+            QuickFilterBox.SelectedIndex = 0;
+            RefreshList();
+        }
+        AssetList.SelectedItem = asset;
+        AssetList.UpdateLayout();
+        if (AssetList.ItemContainerGenerator.ContainerFromItem(asset) is DependencyObject row)
+            for (var parent = PanelDismissal.Parent(row); parent != null && parent != AssetList; parent = PanelDismissal.Parent(parent))
+                if (parent is Expander group) group.IsExpanded = true;
+        AssetList.UpdateLayout();
+        AssetList.ScrollIntoView(asset);
     }
 
     private void ImportPreviewClick(object sender, RoutedEventArgs e)
@@ -506,7 +554,7 @@ public partial class MainWindow : Window
         if(selected==null)return;
         var copy=System.Text.Json.JsonSerializer.Deserialize<ClothingAsset>(System.Text.Json.JsonSerializer.Serialize(selected))!;
         copy.Id=Guid.NewGuid().ToString("N");copy.Ped=copy.Ped.Contains("mp_f_")?"mp_m_freemode_01":"mp_f_freemode_01";
-        project.Items.Add(copy);selected=copy;RefreshList();SyncItem();
+        ClothingImport.Append(project.Items,copy);selected=copy;RefreshList();SyncItem();QueueAddedItemReveal(copy);
     }
     private void ReplaceClick(object sender,RoutedEventArgs e) {if(selected==null)return;var d=new OpenFileDialog{Filter="Drawable (*.ydd)|*.ydd"};if(d.ShowDialog(this)==true){selected.ModelPath=d.FileName;selected.GeneratedLods=false;ClearModel();RefreshList();SyncItem();}}
     private void CopyNameClick(object sender,RoutedEventArgs e) {if(selected!=null)Clipboard.SetText(selected.Name);}
@@ -695,9 +743,30 @@ public partial class MainWindow : Window
 
     private void PreviewTextureChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (syncing || selected == null || WorkspaceTabs.SelectedIndex != 1) return;
-        ClearModel();
-        _ = TryAssetPreview(false);
+        if (syncing || selected == null) return;
+        TextureList.SelectedIndex = PreviewTextureBox.SelectedIndex;
+        if (WorkspaceTabs.SelectedIndex == 1)
+        {
+            if (activePreviewPed) _ = RenderPedAsync(true);
+            else _ = TryAssetPreview(false, true);
+        }
+    }
+
+    private void TextureSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (syncing || selected == null) return;
+        textureSelections[selected.Id] = TextureList.SelectedIndex;
+        if (PreviewTextureBox.SelectedIndex != TextureList.SelectedIndex)
+            PreviewTextureBox.SelectedIndex = TextureList.SelectedIndex;
+    }
+
+    private void TextureDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || selected == null ||
+            ItemsControl.ContainerFromElement(TextureList, e.OriginalSource as DependencyObject) is not ListBoxItem row) return;
+        TextureList.SelectedIndex = TextureList.ItemContainerGenerator.IndexFromContainer(row);
+        PreviewTabClick(sender, e);
+        e.Handled = true;
     }
 
     private string? SelectedTexturePath()
@@ -751,7 +820,7 @@ public partial class MainWindow : Window
     private void PreviewTabClick(object sender, RoutedEventArgs e)
     {
         if (selected == null) { MessageBox.Show("Select a drawable to preview.", "Duck Studio"); return; }
-        new PreviewWindow(selected, settings) { Owner = this }.Show();
+        new PreviewWindow(selected, settings, TextureList.SelectedIndex) { Owner = this }.Show();
     }
     private void SettingsClick(object sender, RoutedEventArgs e)
     {
@@ -949,11 +1018,11 @@ public partial class MainWindow : Window
         distance = Math.Max(distance, FitPreviewDistance() * .45);
         UpdateCamera();
     }
-    private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { dragStart = e.GetPosition(ModelViewport); ModelViewport.CaptureMouse(); }
+    private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { if(e.ChangedButton == MouseButton.Left) { dragStart = e.GetPosition(ModelViewport); ModelViewport.CaptureMouse(); } }
     private void ViewportMouseMove(object sender, MouseEventArgs e)
     {
         if (dragStart == null || e.LeftButton != MouseButtonState.Pressed) { dragStart = null; ModelViewport.ReleaseMouseCapture(); return; }
-        var point = e.GetPosition(ModelViewport); orbitX += (point.X - dragStart.Value.X) * .008; orbitY = Math.Clamp(orbitY + (point.Y - dragStart.Value.Y) * .008, -1.35, 1.35); dragStart = point; UpdateCamera();
+        var point = e.GetPosition(ModelViewport); orbitX += OrbitControls.HorizontalDelta(point.X - dragStart.Value.X, settings.InvertPanning); orbitY = Math.Clamp(orbitY + (point.Y - dragStart.Value.Y) * .008, -1.35, 1.35); dragStart = point; UpdateCamera();
     }
     private void ViewportMouseWheel(object sender, MouseWheelEventArgs e)
     {

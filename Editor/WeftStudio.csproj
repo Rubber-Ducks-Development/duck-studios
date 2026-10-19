@@ -9,7 +9,7 @@
     <RootNamespace>DuckStudio</RootNamespace>
     <Product>Duck Studio</Product>
     <Title>Duck Studio</Title>
-    <Version>2.1.3</Version>
+    <Version>2.1.7</Version>
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>

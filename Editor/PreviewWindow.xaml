@@ -1,5 +1,17 @@
 <Window x:Class="DuckStudio.PreviewWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Duck Studio - Clothes Preview" Icon="Assets/AppIconSource.png" Width="1160" Height="850" MinWidth="760" MinHeight="600" WindowStartupLocation="CenterOwner" Background="#356899" Foreground="#202020" UseLayoutRounding="True" SnapsToDevicePixels="True" Loaded="WindowLoaded" Closed="WindowClosed">
   <Window.Resources>
+    <Style TargetType="TabItem">
+      <Setter Property="Foreground" Value="#202020"/><Setter Property="Background" Value="#E2E2E2"/><Setter Property="Padding" Value="8,5"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
+        <Border x:Name="TabChrome" Background="{TemplateBinding Background}" BorderBrush="#ABABAB" BorderThickness="1" Padding="{TemplateBinding Padding}">
+          <ContentPresenter ContentSource="Header" TextElement.Foreground="{TemplateBinding Foreground}"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsSelected" Value="True"><Setter TargetName="TabChrome" Property="Background" Value="#FFFFFF"/><Setter TargetName="TabChrome" Property="BorderBrush" Value="#567B9D"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="TabChrome" Property="BorderBrush" Value="#567B9D"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style TargetType="Button"><Setter Property="Padding" Value="8,4"/><Setter Property="Margin" Value="0,0,0,6"/><Setter Property="MinHeight" Value="28"/></Style>
     <Style TargetType="CheckBox"><Setter Property="Margin" Value="0,0,0,9"/></Style>
     <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/></Style>
@@ -11,7 +23,7 @@
       <DockPanel Margin="10,8,10,8">
         <Button DockPanel.Dock="Top" Content="&lt; Menu" Click="ToggleMenuClick" HorizontalAlignment="Left" Width="75"/>
         <TextBlock DockPanel.Dock="Bottom" Text="Powered by CodeWalker" HorizontalAlignment="Center" Foreground="#666666" FontSize="11" Margin="0,7,0,3"/>
-        <TabControl x:Name="OptionTabs" Background="#F2F2F2" BorderThickness="0" Margin="0,4,0,0">
+        <TabControl x:Name="OptionTabs" Style="{StaticResource StableTabs}" Background="#F2F2F2" BorderThickness="0" Margin="0,4,0,0">
           <TabItem Header="Options"><ScrollViewer><StackPanel Margin="4,12,8,10">
             <TextBlock Text="Rendering" FontWeight="SemiBold" Margin="0,0,0,8"/>
             <TextBlock Text="Render mode"/><ComboBox x:Name="RenderModeBox" SelectionChanged="DisplayOptionChanged" Margin="0,4,0,12"><ComboBoxItem Content="Textured"/><ComboBoxItem Content="Solid"/></ComboBox>
@@ -21,6 +33,7 @@
             <CheckBox x:Name="GridBox" Content="Grid" Checked="DisplayOptionChanged" Unchecked="DisplayOptionChanged"/>
             <CheckBox x:Name="FloorBox" Content="Show floor" Checked="DisplayOptionChanged" Unchecked="DisplayOptionChanged"/>
             <CheckBox x:Name="AutoRotateBox" Content="Auto rotate camera" Checked="DisplayOptionChanged" Unchecked="DisplayOptionChanged"/>
+            <CheckBox x:Name="InvertPanningBox" Content="Invert horizontal panning" Checked="InvertPanningChanged" Unchecked="InvertPanningChanged" ToolTip="Reverse the horizontal drag direction. Saved for all 3D previews."/>
             <TextBlock Text="Fitting pose"/><ComboBox x:Name="PoseBox" SelectionChanged="PoseChanged" Margin="0,4,0,9"><ComboBoxItem Content="Standing"/><ComboBoxItem Content="Walking"/><ComboBoxItem Content="Running"/><ComboBoxItem Content="Sitting"/><ComboBoxItem Content="Aiming"/></ComboBox>
             <CheckBox x:Name="PlayPoseBox" Content="Play fitting animation" IsChecked="True"/>
             <TextBlock Text="Procedural rig poses. Use the FiveM companion for exact game animations and cloth physics." Foreground="#555555" FontSize="11" Margin="0,0,0,12"/>

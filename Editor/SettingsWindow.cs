@@ -17,6 +17,7 @@ internal sealed class SettingsWindow : Window
     private readonly TextBox collectionBox;
     private readonly TextBox outputBox;
     private readonly TextBox gtaBox;
+    private readonly CheckBox invertPanningBox;
     private readonly ListBox sections;
     private readonly StackPanel generalPanel;
     private readonly StackPanel assetsPanel;
@@ -118,6 +119,10 @@ internal sealed class SettingsWindow : Window
             if (dialog.ShowDialog(this) == true) gtaBox.Text = dialog.FileName;
         };
         generalPanel.Children.Add(browseGame);
+        Heading(generalPanel, "3D navigation:");
+        invertPanningBox = new CheckBox { Content = "Invert horizontal panning", IsChecked = settings.InvertPanning, Foreground = Text, Margin = new Thickness(0, 8, 0, 8) };
+        generalPanel.Children.Add(invertPanningBox);
+        Help(generalPanel, "By default, dragging right rotates the model to the right. Invert reverses this direction in all 3D previews.");
 
         Heading(assetsPanel, "Build output:");
         Help(assetsPanel, "Build project generates binary YMT files for each gender, ShopPedApparel META files, fxmanifest.lua, and all clothing / texture files. You do not need to attach metadata. First-person models and cloth physics are included when selected on the drawable.");
@@ -265,6 +270,7 @@ internal sealed class SettingsWindow : Window
         project.OutputFolder = outputBox.Text.Trim();
         settings.GtaFolderPath = string.IsNullOrWhiteSpace(gtaBox.Text) ? "" : Path.GetDirectoryName(gtaBox.Text)!;
         project.GtaFolderPath = settings.GtaFolderPath;
+        settings.InvertPanning = invertPanningBox.IsChecked == true;
         settings.Save();
         DialogResult = true;
     }

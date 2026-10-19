@@ -32,7 +32,7 @@ public partial class PreviewWindow : Window
     private CancellationTokenSource? loadCancellation;
     private readonly Stopwatch poseTime=Stopwatch.StartNew();
 
-    public PreviewWindow(ClothingAsset selected, AppSettings appSettings)
+    public PreviewWindow(ClothingAsset selected, AppSettings appSettings, int textureIndex = 0)
     {
         asset = selected;
         settings = appSettings;
@@ -47,8 +47,9 @@ public partial class PreviewWindow : Window
         RenderModeBox.SelectedIndex = 0;
         BackgroundBox.SelectedIndex = 0;
         PoseBox.SelectedIndex = 0;
-        foreach (var path in asset.TexturePaths) TextureBox.Items.Add(Path.GetFileName(path));
-        if (TextureBox.Items.Count > 0) TextureBox.SelectedIndex = 0;
+        InvertPanningBox.IsChecked = settings.InvertPanning;
+        foreach (var path in asset.TexturePaths) TextureBox.Items.Add($"{(char)('a' + TextureBox.Items.Count)}   {asset.TextureLabels.GetValueOrDefault(path, Path.GetFileName(path))}");
+        if (TextureBox.Items.Count > 0) TextureBox.SelectedIndex = Math.Clamp(textureIndex, 0, TextureBox.Items.Count - 1);
         rotationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         rotationTimer.Tick += (_, _) => { if (AutoRotateBox.IsChecked == true && currentVisual != null) { orbitX += .006; UpdateCamera(); } };
         rotationTimer.Tick += (_, _) => { if(PlayPoseBox.IsChecked==true && PoseBox.SelectedIndex>0 && currentVisual?.Content is {} model)PreviewPoses.Apply(model,PreviewPoses.Names[PoseBox.SelectedIndex],poseTime.Elapsed.TotalSeconds); };
@@ -75,7 +76,13 @@ public partial class PreviewWindow : Window
         }
         if (currentVisual != null) { distance = Math.Max(distance, FitDistance() * .5); UpdateCamera(); }
     }
-    private void TextureChanged(object sender, SelectionChangedEventArgs e) { if (ready) _ = LoadAsync(); }
+    private void TextureChanged(object sender, SelectionChangedEventArgs e) { if (ready) _ = LoadAsync(true); }
+    private void InvertPanningChanged(object sender, RoutedEventArgs e)
+    {
+        if (!ready) return;
+        settings.InvertPanning = InvertPanningBox.IsChecked == true;
+        settings.Save();
+    }
     private void OnlyClothClick(object sender, RoutedEventArgs e) { pedMode = false; _ = LoadAsync(); }
     private void FitPedClick(object sender, RoutedEventArgs e)
     {
@@ -94,7 +101,7 @@ public partial class PreviewWindow : Window
         var index = TextureBox.SelectedIndex;
         ready = false;
         TextureBox.Items.Clear();
-        foreach (var path in asset.TexturePaths) TextureBox.Items.Add(asset.TextureLabels.GetValueOrDefault(path, Path.GetFileName(path)));
+        foreach (var path in asset.TexturePaths) TextureBox.Items.Add($"{(char)('a' + TextureBox.Items.Count)}   {asset.TextureLabels.GetValueOrDefault(path, Path.GetFileName(path))}");
         TextureBox.SelectedIndex = asset.TexturePaths.Count > 0 ? Math.Clamp(index, 0, asset.TexturePaths.Count - 1) : -1;
         ready = true;
         _ = LoadAsync(true);
@@ -306,7 +313,7 @@ public partial class PreviewWindow : Window
     private void ViewportMouseMove(object sender, MouseEventArgs e)
     {
         if(dragPoint == null || e.LeftButton != MouseButtonState.Pressed)return;
-        var p=e.GetPosition(PreviewViewport); orbitX+=(p.X-dragPoint.Value.X)*.008;orbitY=Math.Clamp(orbitY+(p.Y-dragPoint.Value.Y)*.008,-1.35,1.35);dragPoint=p;UpdateCamera();
+        var p=e.GetPosition(PreviewViewport); orbitX+=OrbitControls.HorizontalDelta(p.X-dragPoint.Value.X, settings.InvertPanning);orbitY=Math.Clamp(orbitY+(p.Y-dragPoint.Value.Y)*.008,-1.35,1.35);dragPoint=p;UpdateCamera();
     }
     private void ViewportMouseWheel(object sender, MouseWheelEventArgs e) { distance=Math.Clamp(distance*(e.Delta>0?.86:1.16),FitDistance()*.4,FitDistance()*15);UpdateCamera();e.Handled=true; }
     private void SaveScreenshotClick(object sender, RoutedEventArgs e)

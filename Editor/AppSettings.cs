@@ -8,6 +8,7 @@ public sealed class AppSettings
     public string GtaFolderPath { get; set; } = "";
     public List<string> RecentProjects { get; set; } = [];
     public bool CheckUpdatesAutomatically { get; set; } = true;
+    public bool InvertPanning { get; set; }
     public string UpdateFeedUrl { get; set; } = "";
     public string SkippedUpdateVersion { get; set; } = "";
 

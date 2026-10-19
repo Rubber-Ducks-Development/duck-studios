@@ -10,11 +10,11 @@ public partial class MainWindow
 {
     private void ApplyIcons()
     {
-        SetButtonIcon(ImportPackageButton, "import-package");
-        SetButtonIcon(ImportGtaButton, "add-item");
-        SetButtonIcon(AddMaleButton, "male-toolbar");
-        SetButtonIcon(AddFemaleButton, "female-toolbar");
-        SetButtonIcon(RemoveItemButton, "remove");
+        SetButtonIcon(ImportPackageButton, "import-package", 16);
+        SetButtonIcon(ImportGtaButton, "add-item", 16);
+        SetButtonIcon(AddMaleButton, "male-toolbar", 16);
+        SetButtonIcon(AddFemaleButton, "female-toolbar", 16);
+        SetButtonIcon(RemoveItemButton, "remove", 16);
         SetButtonIcon(ErrorListButton, "error-list");
         SetButtonIcon(SettingsFooterButton, "settings");
         SetButtonIcon(BuildFooterButton, "build-project");
@@ -27,14 +27,14 @@ public partial class MainWindow
         SetButtonIcon(ExportZipButton, "build-project");
     }
 
-    private static void SetButtonIcon(Button button, string icon)
+    private static void SetButtonIcon(Button button, string icon, double size = 20)
     {
         if (button.Content is not string label) return;
         var content = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var graphic = new Image
         {
-            Source = IconAssets.Get(icon), Width = 20, Height = 20,
-            Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 6, 0),
+            Source = IconAssets.Get(icon), Width = size, Height = size,
+            Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, size == 16 ? 4 : 6, 0),
             SnapsToDevicePixels = true, UseLayoutRounding = true
         };
         RenderOptions.SetBitmapScalingMode(graphic, BitmapScalingMode.HighQuality);

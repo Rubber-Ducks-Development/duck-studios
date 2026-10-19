@@ -7,6 +7,44 @@ namespace DuckStudio;
 public sealed class ClothingAsset : System.ComponentModel.INotifyPropertyChanged
 {
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private bool isNew;
+    private long addedAt;
+    private double newHighlightOpacity;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public double NewHighlightOpacity => newHighlightOpacity;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public System.Windows.Media.Brush NewHighlightForeground => new System.Windows.Media.SolidColorBrush(
+        System.Windows.Media.Color.FromRgb(Blend(0x29), Blend(0x26), Blend(0x11)));
+    private byte Blend(int channel) => (byte)Math.Round(0xEE + (channel - 0xEE) * newHighlightOpacity);
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsNew
+    {
+        get => isNew;
+        set
+        {
+            if (isNew == value) return;
+            isNew = value;
+            if (value) addedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            newHighlightOpacity = value ? 1 : 0;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsNew)));
+            NotifyNewHighlight();
+        }
+    }
+    public void RefreshNewHighlight() => UpdateNewHighlight(System.Diagnostics.Stopwatch.GetElapsedTime(addedAt));
+    public void UpdateNewHighlight(TimeSpan elapsed)
+    {
+        if (!IsNew) return;
+        var opacity = Math.Clamp(1 - (elapsed.TotalSeconds - 2) / .7, 0, 1);
+        if (opacity == 0) { IsNew = false; return; }
+        if (newHighlightOpacity == opacity) return;
+        newHighlightOpacity = opacity;
+        NotifyNewHighlight();
+    }
+    private void NotifyNewHighlight()
+    {
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(NewHighlightOpacity)));
+        PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(NewHighlightForeground)));
+    }
     private bool statusOk = true;
     private string statusTooltip = "No issues found for this drawable.";
     public string Id { get; set; } = Guid.NewGuid().ToString("N");

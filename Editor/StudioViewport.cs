@@ -15,13 +15,14 @@ public sealed class StudioViewport : Grid
     private readonly PerspectiveCamera camera=new(){FieldOfView=40,NearPlaneDistance=.01};
     private ModelVisual3D? visual;
     private Point3D center;private double extent=2,orbit,distance=5,elevation=.06;private Point? drag;
+    private bool invertPanning;
     public Model3D? Model=>visual?.Content;
     public StudioViewport()
     {
         Background=new SolidColorBrush(Color.FromRgb(42,44,48));ClipToBounds=true;Viewport.Camera=camera;Children.Add(Viewport);
         var lights=new Model3DGroup();lights.Children.Add(new AmbientLight(Color.FromRgb(160,166,173)));lights.Children.Add(new DirectionalLight(Colors.White,new(-1,-1,-2)));lights.Children.Add(new DirectionalLight(Color.FromRgb(115,130,148),new(1,-.5,1)));Viewport.Children.Add(new ModelVisual3D{Content=lights});
-        Viewport.MouseDown+=(_,e)=>{if(e.ChangedButton==MouseButton.Left){drag=e.GetPosition(this);Viewport.CaptureMouse();}};Viewport.MouseUp+=(_,_)=>{drag=null;Viewport.ReleaseMouseCapture();};
-        Viewport.MouseMove+=(_,e)=>{if(drag==null||e.LeftButton!=MouseButtonState.Pressed)return;var p=e.GetPosition(this);orbit+=(p.X-drag.Value.X)*.008;elevation=Math.Clamp(elevation+(p.Y-drag.Value.Y)*.008,-1.3,1.3);drag=p;UpdateCamera();};
+        Viewport.MouseDown+=(_,e)=>{if(e.ChangedButton==MouseButton.Left){invertPanning=AppSettings.Load().InvertPanning;drag=e.GetPosition(this);Viewport.CaptureMouse();}};Viewport.MouseUp+=(_,_)=>{drag=null;Viewport.ReleaseMouseCapture();};
+        Viewport.MouseMove+=(_,e)=>{if(drag==null||e.LeftButton!=MouseButtonState.Pressed)return;var p=e.GetPosition(this);orbit+=OrbitControls.HorizontalDelta(p.X-drag.Value.X,invertPanning);elevation=Math.Clamp(elevation+(p.Y-drag.Value.Y)*.008,-1.3,1.3);drag=p;UpdateCamera();};
         Viewport.MouseWheel+=(_,e)=>{distance=Math.Clamp(distance*(e.Delta>0?.86:1.16),Fit()*.3,Fit()*12);UpdateCamera();e.Handled=true;};SizeChanged+=(_,_)=>{if(visual!=null)UpdateCamera();};
     }
     public void Set(NativePreviewResult result,bool preserve=false)

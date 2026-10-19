@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.1.7
+
+- Reveal the last added clothing item once per batch, including resource imports and gender copies, without scrolling through intermediate additions.
+- Expand the target clothing category and clear a hiding search/filter when necessary to reveal the addition.
+- Use compact clothing action buttons that wrap within narrow panes instead of clipping the Remove button.
+- Replace the pants icon with a clearer two-leg outline, waistband and pockets.
+
+## 2.1.6
+
+- Highlight newly added clothing rows in light yellow for two seconds, then fade to normal over 0.7 seconds, including new imports and gender copies.
+- Track each addition's age through selection and list refreshes; no click is required to clear the highlight.
+
+## 2.1.5
+
+- Keep male items first and female items below them within each clothing category, without separate gender dropdowns.
+- Append added models and gender copies at the next position for their gender and clothing type, starting at zero for an empty type.
+- Append imported resource items after existing positions while preserving source filename matching for YTD textures.
+- Preserve the positions of existing items when reimporting their source models.
+
+## 2.1.4
+
+- Make horizontal model rotation follow the pointer and save an invert-panning option in Settings and the preview menu.
+- Open texture rows by double-clicking and pass the selected variation into the separate 3D preview instead of resetting to A.
+- Synchronize the texture list and preview selector, retaining the camera when changing variations.
+- Import YTD files into existing drawables, including files selected separately from their models; report unmatched or ambiguous files.
+- Separate the library into collapsible Male and Female groups, each with its own clothing slots.
+- Keep preview tabs in their declared positions and remove button press scaling.
+- Draw collapse arrows with light strokes on transparent charcoal headers.
+- Add editor regression checks and optional real-model YTD material verification.
+
 ## 2.1.3
 
 - Use `.duckproj` for new saves, exported workspaces and automatic recovery snapshots.

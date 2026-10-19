@@ -50,6 +50,7 @@ static class RealPreviewChecks
         preview.Close();
         DctPhotoWorkflow(folder, model, original, artwork, core, check);
         BuildDiffuseVariations(folder,model,artwork,core,check);
+        ClothingExportChecks.Run(root,check);
     }
     static void BuildDiffuseVariations(string folder,string model,string artwork,string core,Action<bool,string> check)
     {

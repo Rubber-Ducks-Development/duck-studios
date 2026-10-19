@@ -12,6 +12,8 @@ This import uses the adjacent built FiveM resource; build in Durty Cloth Tool fi
 Save imported work as `.duckproj`. Studio does not write the Durty Cloth project format.
 The installer offers Open With for all four extensions and keeps other apps' defaults.
 
+Imported YTD image replacements preserve dictionary lookup keys and keep the edited color texture first for streamed clothing. Builds refresh linked images before exporting each variation; original DCT resources remain unchanged.
+
 ## Editor tools
 
 - **Edit > Undo / Redo:** up to 100 project editing steps, including names, deleted items, texture replacements, tattoo changes, batch edits and optimization. Asset contents are captured independently. A restored image stays linked to its original source if that source still matches the saved content; changed artwork is restored as an independent working copy. New edits clear redo. Ctrl+Z / Ctrl+Y work in the workspace; text fields retain their native text undo.

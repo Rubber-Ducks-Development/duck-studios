@@ -192,6 +192,7 @@ public static partial class CodeWalkerPreview
         var decoded = imported.GetMethod("GetTexture", [typeof(byte[])])!.Invoke(null, [dds])
             ?? throw new InvalidDataException("Could not create the image texture.");
         var target = textures.Cast<object>().FirstOrDefault(t => string.Equals(Member(t, "Name")?.ToString(), name, StringComparison.OrdinalIgnoreCase));
+        var added = target == null;
         if (target == null)
         {
             target = decoded;
@@ -204,8 +205,27 @@ public static partial class CodeWalkerPreview
         }
         else foreach (var property in new[] { "Width", "Height", "Depth", "Levels", "Format", "Stride", "Data" })
             textureType.GetProperty(property)!.SetValue(target, Member(decoded, property));
-        var dict = Activator.CreateInstance(dictType)!;
-        dictType.GetMethod("BuildFromTextureList")!.Invoke(dict, [textures]);
+        // Preserve dictionary keys as well as texture names: imported files
+        // can bind a shader hash to an image with a different display name.
+        // Streamed clothing also expects the intended diffuse entry first.
+        var dict = Member(ytd, "TextureDict") ?? Activator.CreateInstance(dictType)!;
+        var hashList = Member(dict, "TextureNameHashes")
+            ?? Activator.CreateInstance(dictType.GetProperty("TextureNameHashes")!.PropertyType)!;
+        var keys = (Member(hashList, "data_items") as uint[] ?? []).ToList();
+        if (keys.Count != textures.Count - (added ? 1 : 0))
+            throw new InvalidDataException("Texture dictionary entries and lookup keys do not match.");
+        if (added) keys.Add(Convert.ToUInt32(Member(target, "NameHash")));
+        var ordered = textures.Cast<object>().ToList();
+        var index = ordered.IndexOf(target);
+        var diffuseKey = keys[index];
+        ordered.RemoveAt(index); keys.RemoveAt(index);
+        ordered.Insert(0, target); keys.Insert(0, diffuseKey);
+        var array = Array.CreateInstance(textureType, ordered.Count);
+        for (int i = 0; i < ordered.Count; i++) array.SetValue(ordered[i], i);
+        var entries = Member(dict, "Textures")
+            ?? Activator.CreateInstance(dictType.GetProperty("Textures")!.PropertyType)!;
+        Set(entries, "data_items", array); Set(hashList, "data_items", keys.ToArray());
+        Set(dict, "Textures", entries); Set(dict, "TextureNameHashes", hashList);
         ytdType.GetProperty("TextureDict")!.SetValue(ytd, dict);
         return ((byte[])ytdType.GetMethod("Save", Type.EmptyTypes)!.Invoke(ytd, null)!, name);
     }

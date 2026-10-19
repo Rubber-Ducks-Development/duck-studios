@@ -49,4 +49,6 @@ Automatic checks are enabled by default. New app and installer copies already se
 
 The installer waits for the old process, verifies package files, and replaces an identified Duck Studio folder. Canceling close cancels installation. Uninstall preserves projects, history and backups.
 
+Smoke-test both a clean installation and an update started with the process working directory set to the existing installation (and a child folder). The installer must release this inherited handle itself, because older editors launch updates without a neutral working directory. Verify preservation of local files and rollback copies. Persistent sharing errors should identify the affected path and produce an installer log; transient sharing errors should recover without disabling antivirus software.
+
 The EXEs do not carry an Authenticode publisher certificate. If adding publisher signing later, sign the installer before hashing it and creating the signed release manifest.

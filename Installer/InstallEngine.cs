@@ -64,7 +64,7 @@ public static class InstallEngine
     }
     public static async Task InstallAsync(string target,Stream payload,PayloadMetadata metadata,string feed,string? installerPath,IProgress<double>? progress=null,bool integrations=true,CancellationToken cancellation=default)
     {
-        target=ResolveInstallFolder(target);CheckRunning(target);
+        target=ResolveInstallFolder(target);ReleaseWorkingDirectory(target);CheckRunning(target);
         metadata.Files=metadata.Files.ToDictionary(p=>p.Key.Replace('/',Path.DirectorySeparatorChar),p=>p.Value,StringComparer.OrdinalIgnoreCase);
         if(!Version.TryParse(metadata.Version,out _)||metadata.Files.Count==0)throw new InvalidDataException("Installation package metadata is invalid.");
         var old=ReadRecord(target);var parent=Directory.GetParent(target)!.FullName;Directory.CreateDirectory(parent);
@@ -85,14 +85,16 @@ public static class InstallEngine
                     total+=entry.Length;if(total>2147483648L)throw new InvalidDataException("Installation package is too large.");
                     var destination=SafePath(stage,relative);Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                     await using(var input=entry.Open())await using(var output=new FileStream(destination,FileMode.CreateNew,FileAccess.Write,FileShare.None))await input.CopyToAsync(output,cancellation);
-                    await using(var input=File.OpenRead(destination))if(!Convert.ToHexString(await SHA256.HashDataAsync(input,cancellation)).Equals(expected,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Installation file checksum failed: "+entry.FullName);
+                    string? actualHash=null;
+                    await RetryFileOperationAsync(async()=>{await using var input=File.OpenRead(destination);actualHash=Convert.ToHexString(await SHA256.HashDataAsync(input,cancellation));},destination,cancellation);
+                    if(!string.Equals(actualHash,expected,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("Installation file checksum failed: "+entry.FullName);
                     progress?.Report((double)++count/metadata.Files.Count*.8);
                 }
                 if(seen.Count!=metadata.Files.Count)throw new InvalidDataException("Installation package is incomplete.");
             }
             if(!File.Exists(Path.Combine(stage,"DuckStudio.exe"))||!File.Exists(Path.Combine(stage,"DuckStudio.dll")))throw new InvalidDataException("Installation package is missing Duck Studio.");
             var installedFiles=metadata.Files.Keys.ToList();
-            if(installerPath!=null){File.Copy(installerPath,Path.Combine(stage,"DuckStudioSetup.exe"),true);installedFiles.Add("DuckStudioSetup.exe");}
+            if(installerPath!=null){var copy=Path.Combine(stage,"DuckStudioSetup.exe");await RetryFileOperationAsync(()=>File.Copy(installerPath,copy,true),copy,cancellation);installedFiles.Add("DuckStudioSetup.exe");}
             if(old!=null&&Directory.Exists(target))
             {
                 var owned=old.Files.ToHashSet(StringComparer.OrdinalIgnoreCase);owned.Add(Marker);owned.Add("update-channel.json");
@@ -109,9 +111,9 @@ public static class InstallEngine
             // Both paths are validated absolute children of the selected application's
             // parent, and an existing target is identified by its Duck Studio marker.
             CheckRunning(target);
-            if(Directory.Exists(target))Directory.Move(target,backup);
-            try{Directory.Move(stage,target);swapped=true;}
-            catch{if(Directory.Exists(backup))Directory.Move(backup,target);throw;}
+            if(Directory.Exists(target))await RetryFileOperationAsync(()=>Directory.Move(target,backup),target,cancellation);
+            try{await RetryFileOperationAsync(()=>Directory.Move(stage,target),stage,cancellation);swapped=true;}
+            catch{if(Directory.Exists(backup))await RetryFileOperationAsync(()=>Directory.Move(backup,target),backup);throw;}
             progress?.Report(.95);
             if(integrations)Register(target,metadata.Version);
             if(Directory.Exists(backup))
@@ -126,11 +128,52 @@ public static class InstallEngine
         {
             if(swapped&&Directory.Exists(backup))
             {
-                var failed=target+".failed-"+Guid.NewGuid().ToString("N");Directory.Move(target,failed);Directory.Move(backup,target);
+                var failed=target+".failed-"+Guid.NewGuid().ToString("N");await RetryFileOperationAsync(()=>Directory.Move(target,failed),target);await RetryFileOperationAsync(()=>Directory.Move(backup,target),backup);
             }
             throw;
         }
-        finally{if(Directory.Exists(stage))Directory.Delete(stage,true);}
+        finally
+        {
+            // A scanner's cleanup lock must not replace the original install error.
+            if(Directory.Exists(stage))try{await RetryFileOperationAsync(()=>Directory.Delete(stage,true),stage);}catch(Exception ex)when(ex is IOException or UnauthorizedAccessException){}
+        }
+    }
+    private static void ReleaseWorkingDirectory(string target)
+    {
+        var current=Path.GetFullPath(Directory.GetCurrentDirectory()).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);
+        if(!current.Equals(target,StringComparison.OrdinalIgnoreCase)&&!current.StartsWith(target+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))return;
+        var neutral=Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath()));
+        if(!Directory.Exists(neutral)||neutral.Equals(target,StringComparison.OrdinalIgnoreCase)||neutral.StartsWith(target+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase))neutral=Directory.GetParent(target)!.FullName;
+        // The installer owns its process. Release the inherited directory handle
+        // before replacing the installation, including launches by older editors.
+        Directory.SetCurrentDirectory(neutral);
+    }
+    internal static Task RetryFileOperationAsync(Action operation,string path,CancellationToken cancellation=default)
+        =>RetryFileOperationAsync(()=>{operation();return Task.CompletedTask;},path,cancellation);
+    internal static async Task RetryFileOperationAsync(Func<Task> operation,string path,CancellationToken cancellation=default)
+    {
+        for(var attempt=0;;attempt++)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            try{await operation().ConfigureAwait(false);return;}
+            catch(IOException ex)when((ex.HResult&0xFFFF) is 32 or 33)
+            {
+                if(attempt>=7)throw new IOException($"Windows kept '{path}' in use after retrying. Close Duck Studio and any other installer windows, then try again.",ex);
+                await Task.Delay(Math.Min(100*(1<<attempt),1000),cancellation).ConfigureAwait(false);
+            }
+        }
+    }
+    public static string? WriteFailureLog(Exception error,string target,string? logFolder=null)
+    {
+        try
+        {
+            logFolder??=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"DuckStudio","Logs");
+            Directory.CreateDirectory(logFolder);
+            var path=Path.Combine(logFolder,"installer-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N")+".log");
+            File.WriteAllText(path,$"Installation target: {target}\nWorking directory: {Directory.GetCurrentDirectory()}\n\n{error}");
+            return path;
+        }
+        catch(Exception ex)when(ex is IOException or UnauthorizedAccessException){return null;}
     }
     private static void Register(string target,string version)
     {
@@ -151,7 +194,7 @@ public static class InstallEngine
     }
     public static void Uninstall(string target,bool integrations=true)
     {
-        target=ResolveInstallFolder(target);var record=ReadRecord(target)??throw new IOException("This folder is not an installed Duck Studio copy.");CheckRunning(target);
+        target=ResolveInstallFolder(target);ReleaseWorkingDirectory(target);var record=ReadRecord(target)??throw new IOException("This folder is not an installed Duck Studio copy.");CheckRunning(target);
         // Validate every owned path before deleting any file, including linked children.
         var files=record.Files.Distinct(StringComparer.OrdinalIgnoreCase).Select(relative=>SafePath(target,relative)).ToArray();
         foreach(var file in files)

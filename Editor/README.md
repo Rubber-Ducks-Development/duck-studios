@@ -99,6 +99,8 @@ Help > Update settings enables automatic checks on startup and every six hours. 
 
 Installer/DuckStudioSetup.exe installs for the current Windows account, creates a Start menu shortcut, adds an uninstall entry and registers Open With for project files. It includes the runtime and rejects unrelated nonempty target folders. Updates keep unknown project files and a previous installation for recovery. Uninstall removes the app's recorded files and keeps user projects, history and backups. Windows publisher signing requires the maintainer's own Authenticode certificate; release-feed signing is included.
 
+The updater runs outside the installation folder and releases inherited working-directory locks before replacing files, including when launched by older Duck Studio versions. Temporary sharing locks are retried briefly. If installation still fails, the error identifies the locked path and provides a diagnostic log under `%LOCALAPPDATA%\DuckStudio\Logs`.
+
 ## Studio 2 verification
 
 44 integration checks covered tattoo conversion/alpha/presets, all four targets, real RPF7 creation, source bundling, history restore independence, optimizer copies/downsize/deduplication, release signatures, corrupt-download rejection, atomic installation, preservation of personal projects and scoped uninstall. All new tool windows were rendered and inspected. Existing material, backup and panel regression checks remain part of the release workflow.

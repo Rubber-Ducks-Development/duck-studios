@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -32,6 +33,12 @@ public sealed class ApplicationUpdates
     private static readonly HttpClient client=new(new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromMinutes(15)};
     public static Version CurrentVersion => Normalize(Assembly.GetExecutingAssembly().GetName().Version!);
     public static Version Normalize(Version version)=>new(version.Major,version.Minor,Math.Max(0,version.Build));
+    public static ProcessStartInfo InstallerStartInfo(string installer, string installFolder, int parentPid)
+    {
+        var start = new ProcessStartInfo(Path.GetFullPath(installer)) { UseShellExecute = true, WorkingDirectory = Path.GetTempPath() };
+        foreach (var value in new[] { "--update", "--install-dir", Path.GetFullPath(installFolder), "--wait-pid", parentPid.ToString(System.Globalization.CultureInfo.InvariantCulture) }) start.ArgumentList.Add(value);
+        return start;
+    }
     public static string ResolveFeed(AppSettings settings)
     {
         if(!string.IsNullOrWhiteSpace(settings.UpdateFeedUrl))return settings.UpdateFeedUrl.Trim();

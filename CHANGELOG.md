@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.8
+
+- Launch the updater with a neutral working directory and release inherited installation-folder handles before replacement, including updates launched by older editors.
+- Retry transient sharing and lock violations during checksum reads, installer copying and folder swaps, with bounded delays and cancellation support.
+- Keep locked-path details in installer errors and save a diagnostic log without letting cleanup or logging failures obscure the original error.
+- Add update regression coverage for inherited and nested working directories, preserved files and rollback copies, temporary locks, cancellation and persistent-lock diagnostics.
+
 ## 2.1.7
 
 - Reveal the last added clothing item once per batch, including resource imports and gender copies, without scrolling through intermediate additions.

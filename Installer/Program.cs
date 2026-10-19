@@ -105,7 +105,12 @@ public sealed class SetupWindow : Window
             await InstallEngine.InstallAsync(target,payload,metadata,Program.Feed(args),Environment.ProcessPath,callback);
             status.Text="Duck Studio "+metadata.Version+" is ready. A Start menu shortcut and uninstall entry have been created.";progress.Value=1;complete=true;install.Content="Open Duck Studio";cancel.Content="Finish";
         }
-        catch(Exception ex){status.Text="Installation could not finish. "+(ex.InnerException??ex).Message;MessageBox.Show(this,(ex.InnerException??ex).Message,"Duck Studio installer",MessageBoxButton.OK,MessageBoxImage.Error);}
+        catch(Exception ex)
+        {
+            var log=InstallEngine.WriteFailureLog(ex,folder.Text);
+            status.Text="Installation could not finish. "+ex.Message;
+            MessageBox.Show(this,ex.Message+(log==null?"":"\n\nDiagnostic log: "+log),"Duck Studio installer",MessageBoxButton.OK,MessageBoxImage.Error);
+        }
         finally{working=false;install.IsEnabled=cancel.IsEnabled=true;}
     }
 }

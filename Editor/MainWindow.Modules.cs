@@ -135,8 +135,7 @@ public partial class MainWindow
     private void LaunchPendingUpdate()
     {
         if(pendingUpdateInstaller==null)return;
-        var start=new ProcessStartInfo(pendingUpdateInstaller){UseShellExecute=true};
-        start.ArgumentList.Add("--update");start.ArgumentList.Add("--install-dir");start.ArgumentList.Add(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));start.ArgumentList.Add("--wait-pid");start.ArgumentList.Add(Environment.ProcessId.ToString());Process.Start(start);
+        Process.Start(ApplicationUpdates.InstallerStartInfo(pendingUpdateInstaller, AppContext.BaseDirectory, Environment.ProcessId));
     }
     public void OpenRequestedProject(string path)=>OpenProjectPath(path);
 }

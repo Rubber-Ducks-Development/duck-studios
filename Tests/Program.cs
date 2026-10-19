@@ -34,6 +34,7 @@ static class Program
         }
         ProjectFileChecks.Run(root,Check);
         SecurityChecks.Run(root,Check);
+        InstallerUpdateChecks.Run(root,Check);
         Environment.SetEnvironmentVariable("WEFT_STUDIO_DATA_HOME", Path.Combine(root, "EditorSettings"));
         EditorInteractionChecks.Run(root,Check);
         RealPreviewChecks.Run(root,Check);

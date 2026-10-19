@@ -111,3 +111,6 @@ The updater runs outside the installation folder and releases inherited working-
 Use Help > Preview debug report after reproducing a texture mismatch. Refresh, then copy or save the report for support. It records selected file names and linked artwork, renderer failures, and the resolved texture name/source for each material. The Windows profile prefix is redacted; review filenames before sharing. Reports contain no model or image data. Recent events are bounded and stay in memory until a report is saved.
 
 Drag or scroll anywhere on the preview background to rotate or zoom. From photos is available beside Menu, in Textures data, and in the main 3D Preview sidebar. Imported artwork becomes a linked YTD variation and is selected for preview. The blue background preset is named Duck Blue.
+
+
+Clothing categories keep their open/closed state while adding clothes or filtering the list. New additions scroll into view; if their category is closed, its header is revealed without reopening it. All 3D previews support close detail zoom with proportional wheel movement and adaptive near clipping. Opening the preview menu or resizing the main preview preserves close zoom.

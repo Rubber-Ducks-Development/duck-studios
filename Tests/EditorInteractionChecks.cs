@@ -16,6 +16,10 @@ static class EditorInteractionChecks
         check(OrbitControls.HorizontalDelta(100, false) < 0 && OrbitControls.HorizontalDelta(-100, false) > 0,
             "Default orbit follows horizontal pointer direction");
         check(OrbitControls.HorizontalDelta(100, true) == -OrbitControls.HorizontalDelta(100, false), "Inverted orbit reverses direction");
+        var close = 5d;
+        for (int i = 0; i < 60; i++) close = OrbitControls.ZoomDistance(close, 120, 5);
+        check(close > 0 && close <= .01 && OrbitControls.NearPlane(close) < close, "Zoom reaches close detail distances with a smaller near clipping plane");
+        check(Math.Abs(OrbitControls.ZoomDistance(OrbitControls.ZoomDistance(5, 60, 5), 60, 5) - OrbitControls.ZoomDistance(5,120,5)) < .000001, "Partial wheel deltas produce proportional smooth zoom");
         var settings = new AppSettings { InvertPanning = true };
         settings.Save();
         check(AppSettings.Load().InvertPanning, "Inverted panning persists across settings reload");
@@ -155,6 +159,21 @@ static class EditorInteractionChecks
         var before = (double)typeof(PreviewWindow).GetField("distance",Private)!.GetValue(preview)!;
         surface.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,0,120){RoutedEvent=Mouse.MouseWheelEvent});
         check((double)typeof(PreviewWindow).GetField("distance",Private)!.GetValue(preview)! < before, "Scrolling empty blue preview background zooms the camera");
+        for (int i=0; i<60; i++) surface.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,0,120){RoutedEvent=Mouse.MouseWheelEvent});
+        var zoomed=(double)typeof(PreviewWindow).GetField("distance",Private)!.GetValue(preview)!;
+        check(zoomed < .02 && camera.NearPlaneDistance < zoomed, "Standalone preview zooms much closer than the previous fitted-distance limit");
+        typeof(PreviewWindow).GetField("currentVisual",Private)!.SetValue(preview,new System.Windows.Media.Media3D.ModelVisual3D());
+        Call(preview,"ToggleMenuClick",preview,new RoutedEventArgs());
+        check(Math.Abs((double)typeof(PreviewWindow).GetField("distance",Private)!.GetValue(preview)!-zoomed)<.000001,"Opening preview options preserves close zoom");
+        typeof(PreviewWindow).GetField("currentVisual",Private)!.SetValue(preview,null);
+        var embedded=(Grid)window.FindName("ModelSurface");
+        typeof(MainWindow).GetField("activeModel",Private)!.SetValue(window,new System.Windows.Media.Media3D.ModelVisual3D());
+        for (int i=0; i<60; i++) embedded.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,0,120){RoutedEvent=Mouse.MouseWheelEvent});
+        var embeddedZoom=(double)typeof(MainWindow).GetField("distance",Private)!.GetValue(window)!;
+        check(embeddedZoom<.02&&((System.Windows.Media.Media3D.PerspectiveCamera)window.FindName("ModelCamera")).NearPlaneDistance<embeddedZoom,"Embedded preview shares close zoom and clipping behavior");
+        Call(window,"ViewportSizeChanged",window,null!);
+        check(Math.Abs((double)typeof(MainWindow).GetField("distance",Private)!.GetValue(window)!-embeddedZoom)<.000001,"Resizing the main preview preserves close zoom");
+        typeof(MainWindow).GetField("activeModel",Private)!.SetValue(window,null);
         check(((ComboBoxItem)((ComboBox)preview.FindName("BackgroundBox")).Items[0]).Content.ToString()=="Duck Blue", "Background option is branded Duck Blue");
         var linked = asset.TexturePaths[7]; asset.TextureSources[linked] = new TextureSourceLink { SourcePath=Path.Combine(root,"chosen.png"), TextureName="chosen_diffuse" };
         var id = PreviewDiagnostics.Begin(asset,linked,"regression");
@@ -199,12 +218,13 @@ static class EditorInteractionChecks
         check(firstOperation.Status == System.Windows.Threading.DispatcherOperationStatus.Aborted && ReferenceEquals(typeof(MainWindow).GetField("itemToReveal", Private)!.GetValue(window), last),
             "Repeated Add requests coalesce into a single final scroll");
         Call(window, "RevealAddedItem"); Layout(content, 1000, 650);
-        var group = Descendants<Expander>(list).First(); group.IsExpanded = false;
+        var group = Descendants<Expander>(list).Single(g=>((System.Windows.Data.CollectionViewGroup)g.DataContext).Items.OfType<ClothingAsset>().Any(a=>a.Slot==last.Slot)); group.IsExpanded = false;
         Call(window, "QueueAddedItemReveal", last); Call(window, "RevealAddedItem"); Layout(content, 1000, 650);
-        check(group.IsExpanded, "Revealing an addition expands its collapsed clothing category");
+        check(!group.IsExpanded, "Revealing an addition preserves its collapsed category and scrolls to the header");
         ((TextBox)window.FindName("SearchBox")).Text = "no_matching_item"; Call(window, "RefreshList");
         Call(window, "QueueAddedItemReveal", last); Call(window, "RevealAddedItem"); Layout(content, 1000, 650);
         check(list.SelectedItem == last && list.Items.Contains(last), "An active search cannot hide the final added item");
+        ClothingGroupStateChecks(window,project,root,check);
         var toolbar = (WrapPanel)window.FindName("ClothingActions");
         var left = (ColumnDefinition)window.FindName("LeftColumn");
         foreach (var width in new[] { 500, 360, 260 })
@@ -221,6 +241,37 @@ static class EditorInteractionChecks
         left.Width = new GridLength(500); Layout(content, 1280, 845);
         check(SlotIcons.For("lowr").Bounds.Width > 10 && SlotIcons.For("lowr").Bounds.Height >= 18 && !ReferenceEquals(SlotIcons.For("lowr"), SlotIcons.For("jbib")), "Pants use a dedicated full-height trousers outline");
         Save(content, Path.Combine(root, "bulk-pants-revealed.png"), 1280, 845);
+    }
+    static void ClothingGroupStateChecks(MainWindow window,ClothingProject project,string root,Action<bool,string> check)
+    {
+        var content=(FrameworkElement)window.Content;var list=(ListBox)window.FindName("AssetList");
+        var folder=Directory.CreateDirectory(Path.Combine(root,"GroupState")).FullName;
+        foreach(var slot in new[]{"berd","jbib"})
+        {
+            var path=Path.Combine(folder,$"{slot}_000_u.ydd");File.WriteAllBytes(path,[1]);
+            Call(window,"ImportPaths",new[]{path},null!);
+        }
+        Layout(content,1000,650);
+        Expander Group(string slot)=>Descendants<Expander>(list).Single(g=>((System.Windows.Data.CollectionViewGroup)g.DataContext).Items.OfType<ClothingAsset>().Any(a=>a.Slot==slot));
+        Group("berd").IsExpanded=false;Group("jbib").IsExpanded=false;Group("lowr").IsExpanded=true;
+        var beforeTitle=project.Items.First(a=>a.Slot=="berd").GroupTitle;
+        var added=Path.Combine(folder,"berd_001_u.ydd");File.WriteAllBytes(added,[1]);
+        Call(window,"ImportPaths",new[]{added},null!);Layout(content,1000,650);Call(window,"RevealAddedItem");Layout(content,1000,650);
+        check(!Group("berd").IsExpanded&&!Group("jbib").IsExpanded&&Group("lowr").IsExpanded&&project.Items.First(a=>a.Slot=="berd").GroupTitle!=beforeTitle,"Adding a mask preserves all group states even when header counts change");
+        check(((ClothingAsset)list.SelectedItem).ModelPath==added,"A closed group still selects the final added item without reopening");
+        var tops=Enumerable.Range(1,12).Select(i=>Path.Combine(folder,$"jbib_{i:000}_u.ydd")).ToArray();foreach(var path in tops)File.WriteAllBytes(path,[1]);
+        Call(window,"ImportPaths",tops,null!);Layout(content,1000,650);Call(window,"RevealAddedItem");Layout(content,1000,650);
+        check(!Group("berd").IsExpanded&&!Group("jbib").IsExpanded&&Group("lowr").IsExpanded&&((ClothingAsset)list.SelectedItem).ModelPath==tops.Last(),"Bulk additions keep closed masks and tops closed and reveal only the last destination");
+        var scroller=Descendants<ScrollViewer>(list).First();var header=Group("jbib");var position=header.TranslatePoint(new Point(),scroller);
+        check(position.Y>=-1&&position.Y+header.ActualHeight<=scroller.ActualHeight+1,"Adding into a closed category brings its header fully into view");
+        ((TextBox)window.FindName("SearchBox")).Text="no_matching_group";Call(window,"RefreshList");Layout(content,1000,650);
+        ((TextBox)window.FindName("SearchBox")).Text="";Call(window,"RefreshList");Layout(content,1000,650);
+        check(!Group("berd").IsExpanded&&!Group("jbib").IsExpanded&&Group("lowr").IsExpanded,"Search refreshes preserve category expansion choices");
+        var saved=System.Text.Json.JsonSerializer.Serialize(project,ProjectIO.Json);
+        Group("berd").IsExpanded=true;Call(window,"RefreshList");Layout(content,1000,650);
+        check(Group("berd").IsExpanded&&!Group("jbib").IsExpanded,"Manually reopening a category persists through the next refresh");
+        check(System.Text.Json.JsonSerializer.Serialize(project,ProjectIO.Json)==saved,"Category expansion state stays out of project saves and undo data");
+        Save(content,Path.Combine(root,"preserved-group-states.png"),1000,650);
     }
     static void Call(object target, string name, params object[] args) => target.GetType().GetMethod(name, Private)!.Invoke(target, args);
     static void Layout(FrameworkElement element, int w, int h) { element.Measure(new Size(w, h)); element.Arrange(new Rect(0, 0, w, h)); element.UpdateLayout(); }

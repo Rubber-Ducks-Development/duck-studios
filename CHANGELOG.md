@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.10
+
+- Preserve each clothing category's open/closed state across single and bulk additions, changing counts, searches and list refreshes.
+- Reveal additions in open categories normally; for a closed category, scroll to its header without reopening it.
+- Allow much closer 3D zoom across standalone, embedded, outfit/UV and tattoo previews, with proportional wheel deltas and a smaller near clipping plane for detail inspection.
+- Keep close zoom when resizing the main preview or opening the preview menu.
+
 ## 2.1.9
 
 - Add Help > Preview debug report with selected variation, linked artwork, renderer errors and actual scene texture bindings. Reports can be refreshed, copied or saved without model/image contents.

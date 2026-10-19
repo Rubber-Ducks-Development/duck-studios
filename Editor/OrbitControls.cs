@@ -2,6 +2,12 @@ namespace DuckStudio;
 
 public static class OrbitControls
 {
+    public static double ZoomDistance(double distance, int wheelDelta, double fittedDistance)
+    {
+        var fit = Math.Max(.01, fittedDistance);
+        return Math.Clamp(distance * Math.Pow(.86, Math.Clamp(wheelDelta / 120d, -8, 8)), Math.Max(.002, fit * .001), fit * 15);
+    }
+    public static double NearPlane(double distance) => Math.Clamp(distance * .02, .0001, .01);
     public static bool IsSurfaceInput(System.Windows.DependencyObject? source, System.Windows.DependencyObject surface)
     {
         while (source != null && !ReferenceEquals(source, surface))

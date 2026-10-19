@@ -4,8 +4,21 @@ using System.IO;
 
 namespace DuckStudio;
 
+public sealed class ClothingGroupState : System.ComponentModel.INotifyPropertyChanged
+{
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private bool isExpanded = true;
+    public bool IsExpanded
+    {
+        get => isExpanded;
+        set { if (isExpanded == value) return; isExpanded = value; PropertyChanged?.Invoke(this, new(nameof(IsExpanded))); }
+    }
+}
+
 public sealed class ClothingAsset : System.ComponentModel.INotifyPropertyChanged
 {
+    [System.Text.Json.Serialization.JsonIgnore]
+    public ClothingGroupState GroupState { get; set; } = new();
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     private bool isNew;
     private long addedAt;

@@ -100,7 +100,7 @@ public partial class PreviewWindow : Window
             MenuPane.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(170))
             { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } });
         }
-        if (currentVisual != null) { distance = Math.Max(distance, FitDistance() * .5); UpdateCamera(); }
+        if (currentVisual != null) { distance = OrbitControls.ZoomDistance(distance, 0, FitDistance()); UpdateCamera(); }
     }
     private void TextureChanged(object sender, SelectionChangedEventArgs e) { if (ready) _ = LoadAsync(true); }
     private void InvertPanningChanged(object sender, RoutedEventArgs e)
@@ -337,7 +337,7 @@ public partial class PreviewWindow : Window
     private void UpdateCamera()
     {
         var position=new Point3D(center.X+distance*Math.Cos(orbitY)*Math.Sin(orbitX),center.Y+distance*Math.Sin(orbitY),center.Z+distance*Math.Cos(orbitY)*Math.Cos(orbitX));
-        PreviewCamera.Position=position; PreviewCamera.LookDirection=center-position; PreviewCamera.UpDirection=new Vector3D(0,1,0);
+        PreviewCamera.NearPlaneDistance=OrbitControls.NearPlane(distance); PreviewCamera.Position=position; PreviewCamera.LookDirection=center-position; PreviewCamera.UpDirection=new Vector3D(0,1,0);
     }
     private void ViewportSizeChanged(object sender, SizeChangedEventArgs e) { if (currentVisual != null) UpdateCamera(); }
     private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { if(e.ChangedButton==MouseButton.Left && OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, PreviewSurface)){dragPoint=e.GetPosition(PreviewSurface);PreviewSurface.CaptureMouse();e.Handled=true;} }
@@ -348,7 +348,7 @@ public partial class PreviewWindow : Window
         var p=e.GetPosition(PreviewSurface); orbitX+=OrbitControls.HorizontalDelta(p.X-dragPoint.Value.X, settings.InvertPanning);orbitY=Math.Clamp(orbitY+(p.Y-dragPoint.Value.Y)*.008,-1.35,1.35);dragPoint=p;UpdateCamera();
     }
     private void ViewportLostCapture(object sender, MouseEventArgs e) => dragPoint=null;
-    private void ViewportMouseWheel(object sender, MouseWheelEventArgs e) { if(!OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, PreviewSurface))return; distance=Math.Clamp(distance*(e.Delta>0?.86:1.16),FitDistance()*.4,FitDistance()*15);UpdateCamera();e.Handled=true; }
+    private void ViewportMouseWheel(object sender, MouseWheelEventArgs e) { if(!OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, PreviewSurface))return; distance=OrbitControls.ZoomDistance(distance,e.Delta,FitDistance());UpdateCamera();e.Handled=true; }
     private void SaveScreenshotClick(object sender, RoutedEventArgs e)
     {
         var picker=new SaveFileDialog { Filter="PNG image (*.png)|*.png", FileName=asset.Name+"-preview.png" };

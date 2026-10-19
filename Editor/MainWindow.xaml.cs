@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private DispatcherOperation? addedItemReveal;
     private ClothingAsset? itemToReveal;
     private readonly Dictionary<string, int> textureSelections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ClothingGroupState> clothingGroupStates = new(StringComparer.OrdinalIgnoreCase);
     private string? lastSyncedAssetId;
     private ClothingAsset? findingsAsset;
     private readonly TextBlock findingsScopeText = new() { Foreground = Brushes.LightGray, FontSize = 11, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 6) };
@@ -128,7 +129,12 @@ public partial class MainWindow : Window
         var tokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var quickFilter = QuickFilterBox.SelectedIndex;
         foreach(var group in project.Items.GroupBy(x => x.Group))
-            foreach(var item in group) item.GroupTitle=$"{group.Key} ({group.Count(x => x.Ped == "mp_m_freemode_01")}M {group.Count(x => x.Ped == "mp_f_freemode_01")}F)";
+            foreach(var item in group)
+            {
+                item.GroupTitle=$"{group.Key} ({group.Count(x => x.Ped == "mp_m_freemode_01")}M {group.Count(x => x.Ped == "mp_f_freemode_01")}F)";
+                if (!clothingGroupStates.TryGetValue(item.Slot, out var state)) clothingGroupStates[item.Slot] = state = new();
+                item.GroupState = state;
+            }
         var current = selected;
         refreshingList = true;
         var visible = project.Items.Where(x => MatchesSearch(x, tokens) && MatchesQuickFilter(x, quickFilter)).OrderBy(x=>Array.IndexOf(ProjectIO.Slots,x.Slot)).ThenBy(x=>x.Ped == "mp_f_freemode_01" ? 1 : 0).ThenBy(x=>x.Drawable).ToList();
@@ -389,11 +395,16 @@ public partial class MainWindow : Window
         }
         AssetList.SelectedItem = asset;
         AssetList.UpdateLayout();
-        if (AssetList.ItemContainerGenerator.ContainerFromItem(asset) is DependencyObject row)
-            for (var parent = PanelDismissal.Parent(row); parent != null && parent != AssetList; parent = PanelDismissal.Parent(parent))
-                if (parent is Expander group) group.IsExpanded = true;
-        AssetList.UpdateLayout();
-        AssetList.ScrollIntoView(asset);
+        if (FindClothingGroup(AssetList, asset.Slot) is { IsExpanded: false } group) group.BringIntoView();
+        else AssetList.ScrollIntoView(asset);
+    }
+
+    private static Expander? FindClothingGroup(DependencyObject root, string slot)
+    {
+        if (root is Expander { DataContext: System.Windows.Data.CollectionViewGroup group } expander && group.Items.OfType<ClothingAsset>().Any(a => a.Slot.Equals(slot, StringComparison.OrdinalIgnoreCase))) return expander;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            if (FindClothingGroup(VisualTreeHelper.GetChild(root, i), slot) is { } found) return found;
+        return null;
     }
 
     private void ImportPreviewClick(object sender, RoutedEventArgs e)
@@ -992,6 +1003,7 @@ public partial class MainWindow : Window
         var x = target.X + distance * Math.Cos(orbitY) * Math.Sin(orbitX);
         var y = target.Y + distance * Math.Sin(orbitY);
         var z = target.Z + distance * Math.Cos(orbitY) * Math.Cos(orbitX);
+        ModelCamera.NearPlaneDistance = OrbitControls.NearPlane(distance);
         ModelCamera.Position = new Point3D(x, y, z);
         ModelCamera.LookDirection = target - ModelCamera.Position;
         ModelCamera.UpDirection = new Vector3D(0, 1, 0);
@@ -1022,7 +1034,7 @@ public partial class MainWindow : Window
     private void ViewportSizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (activeModel == null) return;
-        distance = Math.Max(distance, FitPreviewDistance() * .45);
+        distance = OrbitControls.ZoomDistance(distance, 0, FitPreviewDistance());
         UpdateCamera();
     }
     private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { if(e.ChangedButton == MouseButton.Left && OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, ModelSurface)) { dragStart = e.GetPosition(ModelSurface); ModelSurface.CaptureMouse(); e.Handled = true; } }
@@ -1037,7 +1049,7 @@ public partial class MainWindow : Window
     {
         if (activeModel == null || !OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, ModelSurface)) return;
         var fit = FitPreviewDistance();
-        distance = Math.Clamp(distance * (e.Delta > 0 ? .86 : 1.16), fit * .45, fit * 15);
+        distance = OrbitControls.ZoomDistance(distance, e.Delta, fit);
         UpdateCamera();
         e.Handled = true;
     }

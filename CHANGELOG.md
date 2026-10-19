@@ -1,20 +1,22 @@
 # Changelog
 
-## 2.1.10
+## 2.1.11
 
-### Renamed clothing texture patch (same version)
+### Clothing texture overrides
 
 - Accept an unambiguous custom-named color texture as a PED variation diffuse override, including imported DCT resources with names such as FF1, CMD and Hat1.
 - Use the same selection rule in build validation, thumbnails, photo imports and 3D previews; exclude model-referenced auxiliary maps and normal/specular names rather than selecting the first YTD entry.
 - Keep unreadable or empty dictionaries blocked, and block unresolved diffuse bindings when only data maps or ambiguous color candidates remain. Preserve original YTD bytes and the previous successful build on validation failure.
 
-### Report scrolling patch (same version)
+### Build and debug reports
 
 - Replace oversized build error message boxes with a bounded, resizable report supporting wheel/keyboard scrolling, horizontal scrolling, copy, save and close.
 - Use the same report layout in Help debug, preserve its scroll position on refresh, and include the latest full build failure.
 - Preserve structured build findings and show the available YTD/embedded texture names alongside missing diffuse maps.
-- Keep texture validation in place; source asset problems require matching model/texture files.
-- Keep the public version and existing release; identify patch builds by source revision in diagnostic/build metadata.
+- Identify exact builds by source revision in diagnostic reports and build metadata.
+- Publish these fixes as 2.1.11 so existing 2.1.10 installations can receive the update.
+
+## 2.1.10
 
 - Preserve each clothing category's open/closed state across single and bulk additions, changing counts, searches and list refreshes.
 - Reveal additions in open categories normally; for a closed category, scroll to its header without reopening it.

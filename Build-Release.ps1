@@ -4,7 +4,8 @@ param(
     [string]$InstallerUrl,
     [string]$FeedUrl,
     [string]$RuntimeVersion='10.0.13',
-    [string]$ReleaseNotes='Duck Studio update'
+    [string]$ReleaseNotes='Duck Studio update',
+    [ValidatePattern('^$|^[a-fA-F0-9]{40}$')][string]$SourceRevision=''
 )
 $ErrorActionPreference='Stop'
 $sourceRoot=$PSScriptRoot
@@ -31,7 +32,7 @@ foreach($stagePath in @($appStage,$installerStage)){
         Remove-Item -LiteralPath $stageFull -Recurse -Force
     }
 }
-dotnet publish $editor -c Release -r win-x64 --self-contained true "-p:RuntimeFrameworkVersion=$RuntimeVersion" -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=true -p:NuGetAuditMode=all "-warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904,NU1905" --ignore-failed-sources -o $appStage
+dotnet publish $editor "-p:SourceRevisionId=$SourceRevision" -c Release -r win-x64 --self-contained true "-p:RuntimeFrameworkVersion=$RuntimeVersion" -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=true -p:NuGetAuditMode=all "-warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904,NU1905" --ignore-failed-sources -o $appStage
 if($LASTEXITCODE -ne 0){throw 'Application publish failed.'}
 Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'Vendor\Runtime') -File|ForEach-Object{Copy-Item -LiteralPath $_.FullName -Destination $appStage -Force}
 $licenseStage=Join-Path $appStage 'third_party_licenses';New-Item -ItemType Directory -Path $licenseStage -Force|Out-Null
@@ -60,7 +61,7 @@ try{
     }
 }finally{$archive.Dispose()}
 $brand=Join-Path $sourceRoot 'Editor\Assets'
-dotnet publish $installerProject -c Release -r win-x64 --self-contained true "-p:RuntimeFrameworkVersion=$RuntimeVersion" -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=true -p:NuGetAuditMode=all "-warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904,NU1905" --ignore-failed-sources "-p:Version=$version" "-p:BrandingRoot=$brand" "-p:PayloadPath=$payload" "-p:PayloadMetadataPath=$payloadMetadata" -o $installerStage
+dotnet publish $installerProject "-p:SourceRevisionId=$SourceRevision" -c Release -r win-x64 --self-contained true "-p:RuntimeFrameworkVersion=$RuntimeVersion" -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=true -p:NuGetAuditMode=all "-warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904,NU1905" --ignore-failed-sources "-p:Version=$version" "-p:BrandingRoot=$brand" "-p:PayloadPath=$payload" "-p:PayloadMetadataPath=$payloadMetadata" -o $installerStage
 if($LASTEXITCODE -ne 0){throw 'Installer publish failed.'}
 New-Item -ItemType Directory -Path $OutputFolder -Force|Out-Null
 Get-ChildItem -LiteralPath $appStage|ForEach-Object{Copy-Item -LiteralPath $_.FullName -Destination $OutputFolder -Recurse -Force}
@@ -83,7 +84,7 @@ try{
     $signature=$rsa.SignData($bytes,[Security.Cryptography.HashAlgorithmName]::SHA256,[Security.Cryptography.RSASignaturePadding]::Pss)
     [IO.File]::WriteAllText((Join-Path $feedFolder 'latest.json'),(@{Payload=[Convert]::ToBase64String($bytes);Signature=[Convert]::ToBase64String($signature)}|ConvertTo-Json))
 }finally{$rsa.Dispose()}
-[IO.File]::WriteAllText((Join-Path $OutputFolder 'UPDATE.json'),(@{Version=$version;Notes=$ReleaseNotes;BuiltUtc=[DateTime]::UtcNow.ToString('o');RendererSha256=(Get-FileHash -LiteralPath (Join-Path $OutputFolder 'rage.exe')).Hash;ApplicationSha256=(Get-FileHash -LiteralPath (Join-Path $OutputFolder 'DuckStudio.dll')).Hash}|ConvertTo-Json))
+[IO.File]::WriteAllText((Join-Path $OutputFolder 'UPDATE.json'),(@{Version=$version;SourceCommit=$SourceRevision;Notes=$ReleaseNotes;BuiltUtc=[DateTime]::UtcNow.ToString('o');RendererSha256=(Get-FileHash -LiteralPath (Join-Path $OutputFolder 'rage.exe')).Hash;ApplicationSha256=(Get-FileHash -LiteralPath (Join-Path $OutputFolder 'DuckStudio.dll')).Hash}|ConvertTo-Json))
 [IO.File]::WriteAllText((Join-Path $OutputFolder 'update-channel.json'),(@{FeedUrl=$FeedUrl}|ConvertTo-Json))
 [IO.File]::WriteAllText((Join-Path $OutputFolder 'duck-install.json'),(@{AppId='DuckStudio';Version=$version;Files=@($fileHashes.Keys)+@('update-channel.json');FeedUrl=$FeedUrl}|ConvertTo-Json -Depth 5))
 Write-Output "Ready: $OutputFolder"

@@ -144,6 +144,7 @@ static class EditorInteractionChecks
         check(System.Text.Json.JsonSerializer.Serialize(project, ProjectIO.Json) == snapshot, "Fading the UI highlight does not change saved project data");
         ScrollAndToolbarChecks(window, project, root, check);
         Save(content, Path.Combine(root, "preview-tabs.png"), 900, 740);
+        ReportChecks.Run(root,check);
         preview.Close();
         Call(window, "WindowClosed", window, EventArgs.Empty);
     }

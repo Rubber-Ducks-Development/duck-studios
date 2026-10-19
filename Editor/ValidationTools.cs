@@ -33,7 +33,7 @@ public static class ProjectValidation
                     try
                     {
                         var stats=CodeWalkerPreview.InspectTextures(path,core);var names=CodeWalkerPreview.TextureNames(path,core).Concat(CodeWalkerPreview.EmbeddedTextureNames(item.ModelPath,core)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                        foreach(var missing in model.DiffuseNames.Where(x=>!names.Contains(x)))findings.Add(new("Error",item.Id,item.Name,$"{Path.GetFileName(path)} is missing diffuse map '{missing}'.","Replace this variation with the matching YTD or reimport its source image using the original YTD template."));
+                        foreach(var missing in model.DiffuseNames.Where(x=>!names.Contains(x)))findings.Add(new("Error",item.Id,item.Name,$"{Path.GetFileName(path)} is missing diffuse map '{missing}'.",$"Expected by model: {missing}. Available in this YTD or embedded in the model: {(names.Count == 0 ? "none" : string.Join(", ", names.Order(StringComparer.OrdinalIgnoreCase)))}. Replace this variation with the matching YTD or reimport its source image using the original YTD template."));
                         if(stats.LargestDimension>2048)findings.Add(new("Warning",item.Id,item.Name,$"{Path.GetFileName(path)} has a {stats.LargestDimension}px texture.","Use the texture optimizer if this resolution is unnecessary."));
                         if(stats.Textures==0)findings.Add(new("Error",item.Id,item.Name,"Empty texture dictionary: "+Path.GetFileName(path),"Replace the dictionary with a valid texture."));
                     }

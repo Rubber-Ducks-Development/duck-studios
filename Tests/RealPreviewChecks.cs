@@ -49,6 +49,23 @@ static class RealPreviewChecks
         Save((FrameworkElement)preview.Content, Path.Combine(folder, "real-texture-a.png"));
         preview.Close();
         DctPhotoWorkflow(folder, model, original, artwork, core, check);
+        BuildFailureReport(folder,model,artwork,core,check);
+    }
+    static void BuildFailureReport(string folder,string model,string artwork,string core,Action<bool,string> check)
+    {
+        var metadata=CodeWalkerPreview.InspectModel(model,core);
+        var embedded=CodeWalkerPreview.EmbeddedTextureNames(model,core);
+        if(!metadata.DiffuseNames.Except(embedded,StringComparer.OrdinalIgnoreCase).Any())return;
+        var wrong=Path.Combine(folder,"wrong-diffuse.ytd");
+        TextureImport.Convert(artwork,wrong,core,model,textureName:"unrelated_report_fixture");
+        var asset=new ClothingAsset{Name="Report fixture",Slot="task",ModelPath=model,TexturePaths=[wrong]};
+        var project=new ClothingProject{Name="Report build",Collection="report_build",OutputFolder=folder,CodeWalkerCorePath=core,Items=[asset]};
+        BuildValidationException? error=null;
+        try{PackBuilder.Build(project,folder);}catch(BuildValidationException ex){error=ex;}
+        check(error?.Findings.Any(f=>f.Problem.Contains("missing diffuse map")&&f.Fix.Contains("unrelated_report_fixture"))==true,"Real build failure retains expected and available diffuse map names in structured findings");
+        check(!Directory.Exists(Path.Combine(folder,"report_build-project")),"Invalid diffuse dictionaries remain blocked before publishing build output");
+        var report=BuildReport.Create(project,error!);
+        check(report.Contains("wrong-diffuse.ytd")&&report.Contains(model)&&report.Contains("unrelated_report_fixture"),"Real build failure report retains file context and available texture names for support");
     }
     static void DctPhotoWorkflow(string folder, string model, string original, string artwork, string core, Action<bool,string> check)
     {

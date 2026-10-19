@@ -114,3 +114,6 @@ Drag or scroll anywhere on the preview background to rotate or zoom. From photos
 
 
 Clothing categories keep their open/closed state while adding clothes or filtering the list. New additions scroll into view; if their category is closed, its header is revealed without reopening it. All 3D previews support close detail zoom with proportional wheel movement and adaptive near clipping. Opening the preview menu or resizing the main preview preserves close zoom.
+
+
+Build failures open a resizable, scrollable Build report instead of a long message box. Use the mouse wheel, scroll bars or Ctrl+End to reach every finding; Copy report and Save report include the complete text. The latest build failure also appears in Help > Preview debug report. Missing diffuse findings show expected and available texture names; send the saved report and matching source assets to support. Same-version patch builds retain the public version and can be distinguished by the Build line in debug reports.

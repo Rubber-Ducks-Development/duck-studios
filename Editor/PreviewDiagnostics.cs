@@ -1,13 +1,21 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Reflection;
 
 namespace DuckStudio;
 
 public static class PreviewDiagnostics
 {
+    public static string BuildIdentity => typeof(PreviewDiagnostics).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? ApplicationUpdates.CurrentVersion.ToString();
     private static readonly object Gate = new();
     private static readonly Queue<string> Events = new();
+    private static string? lastBuildReport;
+    public static void RecordBuildReport(string report)
+    {
+        lock (Gate) lastBuildReport = Redact(report);
+        Record("Build failed. Full details are included in the last build report.");
+    }
     public static void Record(string message)
     {
         lock (Gate)
@@ -37,7 +45,7 @@ public static class PreviewDiagnostics
     public static string Report(string? projectPath, ClothingAsset? asset, int index)
     {
         var report = new StringBuilder("Duck Studio preview debug report\n");
-        report.AppendLine("Version: " + ApplicationUpdates.CurrentVersion).AppendLine("UTC: " + DateTime.UtcNow.ToString("O"));
+        report.AppendLine("Version: " + ApplicationUpdates.CurrentVersion).AppendLine("Build: " + BuildIdentity).AppendLine("UTC: " + DateTime.UtcNow.ToString("O"));
         report.AppendLine("OS: " + Environment.OSVersion).AppendLine("Project: " + (projectPath ?? "Unsaved / imported project"));
         report.AppendLine("Renderer: " + Describe(Path.Combine(AppContext.BaseDirectory, "rage.exe")));
         if (asset != null)
@@ -52,8 +60,12 @@ public static class PreviewDiagnostics
             }
         }
         else report.AppendLine("No clothing selected.");
-        report.AppendLine().AppendLine("Recent preview and import events (current session, newest at bottom):");
-        lock (Gate) foreach (var entry in Events) report.AppendLine(entry);
+        lock (Gate)
+        {
+            if (lastBuildReport != null) report.AppendLine().AppendLine("Latest build failure:").AppendLine(lastBuildReport);
+            report.AppendLine().AppendLine("Recent preview and import events (current session, newest at bottom):");
+            foreach (var entry in Events) report.AppendLine(entry);
+        }
         return Redact(report.ToString());
     }
     private static string Describe(string path)

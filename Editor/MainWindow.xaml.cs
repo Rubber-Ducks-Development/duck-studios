@@ -640,7 +640,7 @@ public partial class MainWindow : Window
         project.OutputFolder = dialog.OutputFolder;
         SyncProject();
         var issues = PackBuilder.Validate(project);
-        if (issues.Count > 0) { MessageBox.Show(string.Join("\n", issues), "Resolve validation issues", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        if (issues.Count > 0) { ShowBuildReport(new InvalidOperationException(string.Join("\n", issues))); return; }
         try
         {
             var path = PackBuilder.Build(project, dialog.OutputFolder, dialog.Options);
@@ -655,7 +655,15 @@ public partial class MainWindow : Window
             }
             MessageBox.Show($"Project exported at:\n{path}\n\nSee the build target README for deployment instructions.{zipNotice}", "Duck Studio", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-        catch (Exception ex) { ShowError(ex); }
+        catch (Exception ex) { ShowBuildReport(ex); }
+    }
+
+    private void ShowBuildReport(Exception error)
+    {
+        var report = BuildReport.Create(project, error);
+        PreviewDiagnostics.RecordBuildReport(report);
+        StatusText.Text = "Build did not finish. Copy or save the build report for details.";
+        new TextReportWindow("Build report", "The build did not finish. Scroll to review all findings, or copy/save the full report for support. File names and project paths are included; review before sharing.", report, "DuckStudio-build-report") { Owner = this }.ShowDialog();
     }
 
     private void ExportProjectClick(object sender, RoutedEventArgs e) => BuildClick(sender,e);
@@ -1053,7 +1061,12 @@ public partial class MainWindow : Window
         UpdateCamera();
         e.Handled = true;
     }
-    private void ShowError(Exception ex) => MessageBox.Show(ex.Message, "Duck Studio", MessageBoxButton.OK, MessageBoxImage.Error);
+    private void ShowError(Exception ex)
+    {
+        if (ex.Message.Length > 1200 || ex.Message.Count(c => c == '\n') > 8)
+            new TextReportWindow("Error report", "Scroll to read the full error. You can copy or save this report for support.", ex.ToString(), "DuckStudio-error-report") { Owner = this }.ShowDialog();
+        else MessageBox.Show(ex.Message, "Duck Studio", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
 }
 
 internal static class ObjPreview

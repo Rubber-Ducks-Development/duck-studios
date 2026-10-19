@@ -52,3 +52,6 @@ The installer waits for the old process, verifies package files, and replaces an
 Smoke-test both a clean installation and an update started with the process working directory set to the existing installation (and a child folder). The installer must release this inherited handle itself, because older editors launch updates without a neutral working directory. Verify preservation of local files and rollback copies. Persistent sharing errors should identify the affected path and produce an installer log; transient sharing errors should recover without disabling antivirus software.
 
 The EXEs do not carry an Authenticode publisher certificate. If adding publisher signing later, sign the installer before hashing it and creating the signed release manifest.
+
+
+For an explicitly requested same-version download replacement, preserve the release title, notes, publication identity and existing tag. Build with -SourceRevision set to the source commit so reports and UPDATE.json identify the exact patch. Back up and verify existing assets, upload replacement assets under temporary names, verify hashes before switching canonical names, and verify the signed public feed before removing the old assets. Already-installed copies at that version will not receive an update prompt; they need a manual download.

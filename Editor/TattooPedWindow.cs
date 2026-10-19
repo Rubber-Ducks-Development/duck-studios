@@ -34,9 +34,9 @@ public sealed class TattooPedWindow : StudioToolWindow
         var fit=Action("Fit PED");toolbar.Children.Add(fit);fit.Click+=(_,_)=>{distance=3.2;tilt=.08;orbit=0;Camera();};
         var border=new Border{Background=new SolidColorBrush(Color.FromRgb(53,104,153)),Child=viewport};Body.Children.Add(border);
         var lights=new Model3DGroup();lights.Children.Add(new AmbientLight(Color.FromRgb(180,180,180)));lights.Children.Add(new DirectionalLight(Color.FromRgb(185,185,185),new Vector3D(-1,-1.4,-1)));viewport.Children.Add(new ModelVisual3D{Content=lights});
-        viewport.MouseLeftButtonDown+=(_,e)=>{pointer=e.GetPosition(viewport);viewport.CaptureMouse();};viewport.MouseLeftButtonUp+=(_,_)=>{pointer=null;viewport.ReleaseMouseCapture();};
-        viewport.MouseMove+=(_,e)=>{if(pointer==null||e.LeftButton!=MouseButtonState.Pressed)return;var point=e.GetPosition(viewport);orbit+=OrbitControls.HorizontalDelta(point.X-pointer.Value.X, settings.InvertPanning, .01);tilt=Math.Clamp(tilt+(point.Y-pointer.Value.Y)*.007,-1.4,1.4);pointer=point;Camera();};
-        viewport.MouseWheel+=(_,e)=>{distance=Math.Clamp(distance*Math.Pow(.9,e.Delta/120d),.4,12);Camera();};
+        border.MouseLeftButtonDown+=(_,e)=>{pointer=e.GetPosition(viewport);border.CaptureMouse();};border.MouseLeftButtonUp+=(_,_)=>{pointer=null;border.ReleaseMouseCapture();};
+        border.MouseMove+=(_,e)=>{if(pointer==null||e.LeftButton!=MouseButtonState.Pressed)return;var point=e.GetPosition(viewport);orbit+=OrbitControls.HorizontalDelta(point.X-pointer.Value.X, settings.InvertPanning, .01);tilt=Math.Clamp(tilt+(point.Y-pointer.Value.Y)*.007,-1.4,1.4);pointer=point;Camera();};
+        border.MouseWheel+=(_,e)=>{distance=Math.Clamp(distance*Math.Pow(.9,e.Delta/120d),.4,12);Camera();};
         tattoo.Changed+=Changed;Loaded+=async(_,_)=>await LoadAsync();
         Closed+=(_,_)=>{closed=true;cancellation.Cancel();tattoo.Changed-=Changed;if(scene!=null)try{Directory.Delete(scene,true);}catch(IOException){}};
     }

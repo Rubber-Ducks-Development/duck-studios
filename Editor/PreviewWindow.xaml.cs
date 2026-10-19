@@ -17,6 +17,7 @@ public partial class PreviewWindow : Window
 {
     private readonly ClothingAsset asset;
     private readonly AppSettings settings;
+    private readonly Func<ClothingAsset, IEnumerable<string>, Task<int>>? importPhotos;
     private readonly DispatcherTimer rotationTimer;
     private ModelVisual3D? currentVisual;
     private ModelVisual3D? floorVisual;
@@ -32,11 +33,13 @@ public partial class PreviewWindow : Window
     private CancellationTokenSource? loadCancellation;
     private readonly Stopwatch poseTime=Stopwatch.StartNew();
 
-    public PreviewWindow(ClothingAsset selected, AppSettings appSettings, int textureIndex = 0)
+    public PreviewWindow(ClothingAsset selected, AppSettings appSettings, int textureIndex = 0, Func<ClothingAsset, IEnumerable<string>, Task<int>>? importPhotos = null)
     {
         asset = selected;
         settings = appSettings;
+        this.importPhotos = importPhotos;
         InitializeComponent();
+        SurfacePhotosButton.IsEnabled = TexturePhotosButton.IsEnabled = importPhotos != null;
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape && !PanelDismissal.HasOpenDropdown(e.OriginalSource as DependencyObject)) { e.Handled = true; Close(); }
@@ -55,6 +58,29 @@ public partial class PreviewWindow : Window
         rotationTimer.Tick += (_, _) => { if(PlayPoseBox.IsChecked==true && PoseBox.SelectedIndex>0 && currentVisual?.Content is {} model)PreviewPoses.Apply(model,PreviewPoses.Names[PoseBox.SelectedIndex],poseTime.Elapsed.TotalSeconds); };
         rotationTimer.Start();
         asset.TexturesChanged += LinkedTextureChanged;
+    }
+    private async void FromPhotosClick(object sender, RoutedEventArgs e)
+    {
+        if (importPhotos == null) return;
+        var picker = new OpenFileDialog { Title = "Add photos to this clothing", Filter = TextureImport.Filter, Multiselect = true };
+        if (picker.ShowDialog(this) != true) return;
+        await ImportPhotosAsync(picker.FileNames);
+    }
+    private async Task ImportPhotosAsync(IEnumerable<string> files)
+    {
+        if (importPhotos == null) return;
+        SurfacePhotosButton.IsEnabled = TexturePhotosButton.IsEnabled = false;
+        try
+        {
+            var index = await importPhotos(asset, files);
+            if (ready && index >= 0)
+            {
+                ready = false; TextureBox.SelectedIndex = index; ready = true;
+                await LoadAsync(true);
+            }
+        }
+        catch (Exception ex) { PreviewDiagnostics.Record("Preview photo import failed: " + ex); MessageBox.Show(this, ex.Message, "Photo import failed"); }
+        finally { SurfacePhotosButton.IsEnabled = TexturePhotosButton.IsEnabled = true; }
     }
     private void WindowLoaded(object sender, RoutedEventArgs e) { ready = true; _ = LoadAsync(); }
     private void WindowClosed(object? sender, EventArgs e)
@@ -109,8 +135,12 @@ public partial class PreviewWindow : Window
     private string? TexturePath => TextureBox.SelectedIndex >= 0 && TextureBox.SelectedIndex < asset.TexturePaths.Count ? asset.TexturePaths[TextureBox.SelectedIndex] : null;
     private async Task LoadAsync(bool preserveCamera = false)
     {
+        if (currentVisual != null) { PreviewViewport.Children.Remove(currentVisual); currentVisual = null; materials.Clear(); }
+        UpdateTextureData();
         if (!File.Exists(asset.ModelPath)) { HintText.Text = "Model file is missing"; HintText.Visibility = Visibility.Visible; return; }
         var version = ++loadVersion;
+        var selectedTexture = TexturePath;
+        var diagnostic = PreviewDiagnostics.Begin(asset, selectedTexture, pedMode ? "window PED" : "window clothing");
         loadCancellation?.Cancel();
         var cancellationSource = new CancellationTokenSource();
         loadCancellation = cancellationSource;
@@ -133,12 +163,12 @@ public partial class PreviewWindow : Window
                 await EnsureIndexAsync(rage, home, Path.Combine(settings.GtaFolderPath, "GTA5.exe"), cancellation);
                 cancellation.ThrowIfCancellationRequested();
                 foreach (var value in new[] { "--exe", Path.Combine(settings.GtaFolderPath, "GTA5.exe"), "ped-scene", "--ped", asset.Ped, "--override-slot", asset.Slot, "--override-ydd", asset.ModelPath, "-o", folder }) start.ArgumentList.Add(value);
-                if (TexturePath is { } pedTexture) { start.ArgumentList.Add("--override-ytd"); start.ArgumentList.Add(pedTexture); }
+                if (selectedTexture is { } pedTexture) { start.ArgumentList.Add("--override-ytd"); start.ArgumentList.Add(pedTexture); }
             }
             else
             {
                 foreach (var value in new[] { "asset-scene", "--ydd", asset.ModelPath, "-o", folder }) start.ArgumentList.Add(value);
-                if (TexturePath is { } texture) { start.ArgumentList.Add("--ytd"); start.ArgumentList.Add(texture); }
+                if (selectedTexture is { } texture) { start.ArgumentList.Add("--ytd"); start.ArgumentList.Add(texture); }
             }
             using var process = Process.Start(start) ?? throw new IOException("Could not start the 3D renderer.");
             var stdout = process.StandardOutput.ReadToEndAsync();
@@ -155,6 +185,7 @@ public partial class PreviewWindow : Window
             if (process.ExitCode != 0) throw new IOException(log);
             if (version != loadVersion) return;
             var result = PedScenePreview.Load(folder);
+            PreviewDiagnostics.Complete(diagnostic, folder, log);
             if (currentVisual != null) PreviewViewport.Children.Remove(currentVisual);
             if (currentScene != null) DeleteScene(currentScene);
             currentScene = folder;
@@ -171,9 +202,10 @@ public partial class PreviewWindow : Window
             HintText.Visibility = Visibility.Collapsed;
             PedStatusText.Text = pedMode ? "Full PED preview loaded." : "Showing the selected clothing only.";
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException) { PreviewDiagnostics.Record($"[{diagnostic}] Superseded or closed preview cancelled."); }
         catch (Exception ex)
         {
+            PreviewDiagnostics.Record($"[{diagnostic}] Preview failed: {ex}");
             if (version == loadVersion) { HintText.Text = "Preview unavailable"; HintText.Visibility = Visibility.Visible; PedStatusText.Text = ex.Message; }
         }
         finally
@@ -229,7 +261,7 @@ public partial class PreviewWindow : Window
         try
         {
             var core = Path.Combine(AppContext.BaseDirectory, "CodeWalker.Core.dll");
-            TextureImage.Source = CodeWalkerPreview.LoadTextureFile(path, core);
+            TextureImage.Source = CodeWalkerPreview.LoadTextureFile(path, core, asset.TextureSources.GetValueOrDefault(path)?.TextureName, asset.ModelPath);
             if (TextureImage.Source is BitmapSource bitmap) TextureDataText.Text += $"\n{bitmap.PixelWidth} × {bitmap.PixelHeight} px";
         }
         catch (Exception ex) { TextureDataText.Text += "\nTexture thumbnail unavailable: " + ex.Message; }
@@ -308,14 +340,15 @@ public partial class PreviewWindow : Window
         PreviewCamera.Position=position; PreviewCamera.LookDirection=center-position; PreviewCamera.UpDirection=new Vector3D(0,1,0);
     }
     private void ViewportSizeChanged(object sender, SizeChangedEventArgs e) { if (currentVisual != null) UpdateCamera(); }
-    private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { if(e.ChangedButton==MouseButton.Left){dragPoint=e.GetPosition(PreviewViewport);PreviewViewport.CaptureMouse();} }
-    private void ViewportMouseUp(object sender, MouseButtonEventArgs e) { dragPoint=null;PreviewViewport.ReleaseMouseCapture(); }
+    private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { if(e.ChangedButton==MouseButton.Left && OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, PreviewSurface)){dragPoint=e.GetPosition(PreviewSurface);PreviewSurface.CaptureMouse();e.Handled=true;} }
+    private void ViewportMouseUp(object sender, MouseButtonEventArgs e) { if(e.ChangedButton==MouseButton.Left){dragPoint=null;PreviewSurface.ReleaseMouseCapture();} }
     private void ViewportMouseMove(object sender, MouseEventArgs e)
     {
         if(dragPoint == null || e.LeftButton != MouseButtonState.Pressed)return;
-        var p=e.GetPosition(PreviewViewport); orbitX+=OrbitControls.HorizontalDelta(p.X-dragPoint.Value.X, settings.InvertPanning);orbitY=Math.Clamp(orbitY+(p.Y-dragPoint.Value.Y)*.008,-1.35,1.35);dragPoint=p;UpdateCamera();
+        var p=e.GetPosition(PreviewSurface); orbitX+=OrbitControls.HorizontalDelta(p.X-dragPoint.Value.X, settings.InvertPanning);orbitY=Math.Clamp(orbitY+(p.Y-dragPoint.Value.Y)*.008,-1.35,1.35);dragPoint=p;UpdateCamera();
     }
-    private void ViewportMouseWheel(object sender, MouseWheelEventArgs e) { distance=Math.Clamp(distance*(e.Delta>0?.86:1.16),FitDistance()*.4,FitDistance()*15);UpdateCamera();e.Handled=true; }
+    private void ViewportLostCapture(object sender, MouseEventArgs e) => dragPoint=null;
+    private void ViewportMouseWheel(object sender, MouseWheelEventArgs e) { if(!OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, PreviewSurface))return; distance=Math.Clamp(distance*(e.Delta>0?.86:1.16),FitDistance()*.4,FitDistance()*15);UpdateCamera();e.Handled=true; }
     private void SaveScreenshotClick(object sender, RoutedEventArgs e)
     {
         var picker=new SaveFileDialog { Filter="PNG image (*.png)|*.png", FileName=asset.Name+"-preview.png" };

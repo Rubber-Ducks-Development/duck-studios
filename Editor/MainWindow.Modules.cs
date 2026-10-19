@@ -137,5 +137,6 @@ public partial class MainWindow
         if(pendingUpdateInstaller==null)return;
         Process.Start(ApplicationUpdates.InstallerStartInfo(pendingUpdateInstaller, AppContext.BaseDirectory, Environment.ProcessId));
     }
+    private void PreviewDebugClick(object sender, RoutedEventArgs e) => new PreviewDebugWindow(() => PreviewDiagnostics.Report(projectPath, selected, selected == null ? -1 : selected.TexturePaths.FindIndex(p => p == SelectedTexturePath()))) { Owner = this }.Show();
     public void OpenRequestedProject(string path)=>OpenProjectPath(path);
 }

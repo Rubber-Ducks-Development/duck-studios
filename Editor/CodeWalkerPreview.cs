@@ -78,7 +78,7 @@ public static partial class CodeWalkerPreview
         var models = (Array?)Member(modelsBlock, new[]{"High","Med","Low","VLow"}[Math.Clamp(lod,0,3)]);
         if (models is not { Length: > 0 }) throw new InvalidDataException("YDD has no high-detail model.");
 
-        var bitmap = LoadTexture(ytdPath);
+        var bitmap = LoadTexture(ytdPath, modelPath: yddPath);
         Brush brush = bitmap is not null
             ? new ImageBrush(PreviewTexture.ForMaterial(bitmap, PreviewTexture.AlphaMode.Opaque))
             {
@@ -163,10 +163,10 @@ public static partial class CodeWalkerPreview
         return new NativePreviewResult(group, center, Math.Max(extent, .2));
     }
 
-    public static BitmapSource? LoadTextureFile(string ytdPath, string coreDll)
+    public static BitmapSource? LoadTextureFile(string ytdPath, string coreDll, string? textureName = null, string? modelPath = null)
     {
         EnsureCore(coreDll);
-        return LoadTexture(ytdPath);
+        return LoadTexture(ytdPath, textureName, modelPath);
     }
 
     public static (byte[] Bytes, string Name) CreateImageTexture(byte[] dds, string coreDll, string modelPath, string? templatePath, string? requestedName)
@@ -314,7 +314,7 @@ public static partial class CodeWalkerPreview
             ?? type.GetField(name, BindingFlags.Public | BindingFlags.Instance)?.GetValue(value);
     }
 
-    private static BitmapSource? LoadTexture(string? path)
+    private static BitmapSource? LoadTexture(string? path, string? textureName = null, string? modelPath = null)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
         var ytdType = core!.GetType("CodeWalker.GameFiles.YtdFile", true)!;
@@ -324,7 +324,9 @@ public static partial class CodeWalkerPreview
         var textures = dictionary == null ? null : Member(dictionary, "Textures");
         var entries = textures == null ? null : (Array?)Member(textures, "data_items");
         if (entries is not { Length: > 0 }) return null;
-        var texture = entries.Cast<object>().FirstOrDefault(t => Member(t, "Usage")?.ToString()?.StartsWith("DIFFUSE", StringComparison.OrdinalIgnoreCase) == true) ?? entries.GetValue(0)!;
+        var names = textureName != null ? new List<string> { textureName } : modelPath != null ? DiffuseTextureNames(modelPath) : [];
+        var texture = names.Select(name => entries.Cast<object>().FirstOrDefault(t => string.Equals(Member(t, "Name")?.ToString(), name, StringComparison.OrdinalIgnoreCase))).FirstOrDefault(t => t != null)
+            ?? entries.Cast<object>().FirstOrDefault(t => Member(t, "Usage")?.ToString()?.StartsWith("DIFFUSE", StringComparison.OrdinalIgnoreCase) == true) ?? entries.GetValue(0)!;
         var width = Convert.ToInt32(Member(texture, "Width"));
         var height = Convert.ToInt32(Member(texture, "Height"));
         var format = Member(texture, "Format")?.ToString();

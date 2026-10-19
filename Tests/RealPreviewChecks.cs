@@ -48,6 +48,36 @@ static class RealPreviewChecks
         check(!TexturePixels(visual!.Content!).SequenceEqual(hColors), "Switching from H to A changes actual 3D texture pixels");
         Save((FrameworkElement)preview.Content, Path.Combine(folder, "real-texture-a.png"));
         preview.Close();
+        DctPhotoWorkflow(folder, model, original, artwork, core, check);
+    }
+    static void DctPhotoWorkflow(string folder, string model, string original, string artwork, string core, Action<bool,string> check)
+    {
+        var path=Path.Combine(folder,"photo-workflow.dctproj"); File.WriteAllText(path,"Adjacent built-resource import fixture");
+        var built=Directory.CreateDirectory(Path.Combine(folder,"clothproject_photo-workflow","photo-workflow_build")).FullName;
+        File.WriteAllText(Path.Combine(built,"fxmanifest.lua"),"fx_version 'cerulean'\ngame 'gta5'");
+        var stream=Directory.CreateDirectory(Path.Combine(built,"stream")).FullName;
+        File.Copy(model,Path.Combine(stream,"mp_m_freemode_01^task_000_u.ydd"));
+        File.Copy(original,Path.Combine(stream,"mp_m_freemode_01^task_diff_000_a_uni.ytd"));
+        var project=ResourceImporter.ImportDurtyProject(path); var asset=project.Items.Single();
+        var window=new MainWindow();
+        typeof(MainWindow).GetField("project",Private)!.SetValue(window,project);
+        typeof(MainWindow).GetField("selected",Private)!.SetValue(window,asset);
+        typeof(MainWindow).GetMethod("SyncItem",Private)!.Invoke(window,null);
+        var import=(Task<int>)typeof(MainWindow).GetMethod("ImportTexturesAsync",Private)!.Invoke(window,[asset,new[]{artwork},-1])!;Pump(import);
+        check(import.Result==1 && ((ListBox)window.FindName("TextureList")).SelectedIndex==1,"DCT project plus dropped PNG selects the new generated YTD variation");
+        var selected=new PreviewWindow(asset,new AppSettings(),import.Result, (a,files)=>(Task<int>)typeof(MainWindow).GetMethod("ImportTexturesAsync",Private)!.Invoke(window,[a,files,-1])!);
+        var load=(Task)typeof(PreviewWindow).GetMethod("LoadAsync",Private)!.Invoke(selected,[false])!;Pump(load);
+        var visual=(ModelVisual3D)typeof(PreviewWindow).GetField("currentVisual",Private)!.GetValue(selected)!;
+        check(TexturePixels(visual.Content).Any(p=>p.R>200&&p.B>130&&p.G<60),"DCT imported clothing renders the dropped PNG's actual magenta pixels");
+        var report=PreviewDiagnostics.Report(path,asset,1);
+        check(report.Contains("selected-ytd")&&report.Contains(Path.GetFileName(artwork)),"DCT photo preview report records the selected artwork and resolved YTD origin");
+        var secondArtwork=Path.Combine(folder,"second-photo.png");File.Copy(artwork,secondArtwork);
+        typeof(PreviewWindow).GetField("ready",Private)!.SetValue(selected,true);
+        var photoImport=(Task)typeof(PreviewWindow).GetMethod("ImportPhotosAsync",Private)!.Invoke(selected,[new[]{secondArtwork}])!;Pump(photoImport);
+        visual=(ModelVisual3D)typeof(PreviewWindow).GetField("currentVisual",Private)!.GetValue(selected)!;
+        check(((ComboBox)selected.FindName("TextureBox")).SelectedIndex==2&&TexturePixels(visual.Content).Any(p=>p.R>200&&p.B>130&&p.G<60),"From photos in an already open preview selects and renders the last imported image");
+        var body=(FrameworkElement)selected.Content;Save(body,Path.Combine(folder,"dct-photo-preview.png"));
+        selected.Close();typeof(MainWindow).GetMethod("WindowClosed",Private)!.Invoke(window,[window,EventArgs.Empty]);
     }
     static List<Color> TexturePixels(Model3D model)
     {

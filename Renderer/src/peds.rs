@@ -106,10 +106,11 @@ pub fn run_asset_scene(args: &AssetSceneArgs) -> Result<()> {
         let bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
         parse_ytd(&bytes)?
     } else { Vec::new() };
-    let override_texture = textures.first().map(|entry| entry.name.clone());
+    let override_texture = selected_diffuse(&drawable, &textures);
     let scene = Composed {
         name: args.ydd.file_stem().unwrap_or_default().to_string_lossy().into_owned(),
-        slots: Vec::new(), textures, warnings: Vec::new(),
+        slots: Vec::new(), textures: Vec::new(), warnings: Vec::new(),
+        texture_overrides: [(0, textures)].into_iter().collect(),
         rigs: [(0, read_rigs(&bytes).ok().and_then(|r| r.into_values().next()).unwrap_or(json::JsonValue::Null))].into_iter().collect(),
         drawables: vec![(0, drawable, override_texture)],
     };
@@ -208,9 +209,33 @@ pub struct Composed {
     pub warnings: Vec<String>,
     drawables: Vec<(usize, Drawable, Option<String>)>,
     rigs: HashMap<usize, json::JsonValue>,
+    // Keep each selected dictionary local to its clothing slot. Base PED
+    // dictionaries can contain the same names with entirely different pixels.
+    texture_overrides: HashMap<usize, Vec<YtdTexture>>,
+}
+
+fn selected_diffuse(drawable: &Drawable, textures: &[YtdTexture]) -> Option<String> {
+    (0..drawable.shader_count() as u16)
+        .filter_map(|id| drawable.diffuse_texture_name(id))
+        .find_map(|name| textures.iter().find(|t| t.name.eq_ignore_ascii_case(name)))
+        .or_else(|| textures.iter().find(|t| t.name.to_lowercase().contains("_diff_")))
+        .or_else(|| textures.first()).map(|t| t.name.clone())
+}
+
+fn selected_texture<'a>(textures: &'a [YtdTexture], shader_name: Option<&str>, fallback: Option<&str>) -> Option<&'a YtdTexture> {
+    shader_name.and_then(|name| textures.iter().find(|t| t.name.eq_ignore_ascii_case(name)))
+        .or_else(|| fallback.and_then(|name| textures.iter().find(|t| t.name.eq_ignore_ascii_case(name))))
 }
 
 impl Composed {
+    fn resolve_texture<'a>(&'a self, slot: usize, drawable: &'a Drawable, shader: Option<&str>, fallback: Option<&str>) -> Option<(&'a YtdTexture, &'static str)> {
+        if let Some(textures) = self.texture_overrides.get(&slot) {
+            selected_texture(textures, shader, fallback).map(|t| (t, "selected-ytd"))
+        } else {
+            fallback.or(shader).and_then(|name| self.textures.iter().find(|t| t.name.eq_ignore_ascii_case(name)))
+                .map(|t| (t, "ped-dictionary"))
+        }.or_else(|| shader.and_then(|name| drawable.shader_group.as_ref()?.textures.iter().find(|t| t.name.eq_ignore_ascii_case(name))).map(|t| (t, "embedded-model")))
+    }
     pub fn export_scene(&self, output: &Path) -> Result<()> {
         std::fs::create_dir_all(output)?;
         let mut meshes = json::JsonValue::new_array();
@@ -241,14 +266,12 @@ impl Composed {
                             .map(|a| a.value.as_rgba8()).unwrap_or(vertex.blend_indices);
                         blend_indices.extend(ids);
                     }
-                    let texture_name = override_texture.as_deref().or_else(|| drawable.diffuse_texture_name(geometry.shader_id));
-                    let texture_file = texture_name.and_then(|name| {
-                        self.textures.iter().chain(drawable.shader_group.as_ref().into_iter().flat_map(|group| group.textures.iter()))
-                            .find(|texture| texture.name.eq_ignore_ascii_case(name))
-                            .map(|texture| (name, texture))
-                    }).and_then(|(name, texture)| {
+                    let shader_name = drawable.diffuse_texture_name(geometry.shader_id);
+                    let resolved = self.resolve_texture(*slot, drawable, shader_name, override_texture.as_deref());
+                    let texture_file = resolved.and_then(|(texture, _)| {
+                        let name = &texture.name;
                         let stem: String = name.chars().map(|ch| if ch.is_ascii_alphanumeric() || ch == '_' { ch } else { '_' }).collect();
-                        let file = format!("{}_{}.png", stem, rage_joaat(&name.to_lowercase()));
+                        let file = format!("slot{}_{}_{}.png", slot, stem, rage_joaat(&name.to_lowercase()));
                         if written.insert(file.clone()) {
                             match encode_scene_texture(texture) {
                                 Ok(bytes) => { if std::fs::write(output.join(&file), bytes).is_err() { return None; } },
@@ -262,6 +285,9 @@ impl Composed {
                         "shader": drawable.shader_group.as_ref().and_then(|group| group.shaders.get(geometry.shader_id as usize)).map_or(0, |shader| shader.file_name_hash),
                         "render_bucket": drawable.shader_group.as_ref().and_then(|group| group.shaders.get(geometry.shader_id as usize)).map_or(0, |shader| shader.render_bucket),
                         "texture": texture_file,
+                        "texture_name": resolved.map(|(t, _)| t.name.clone()),
+                        "texture_origin": resolved.map(|(_, origin)| origin),
+                        "shader_diffuse": shader_name,
                         "positions": positions,
                         "normals": normals,
                         "uvs": uvs,
@@ -299,10 +325,11 @@ impl Composed {
         let texture = if let Some(path) = ytd {
             let bytes = std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
             let loaded = parse_ytd(&bytes)?;
-            let first = loaded.first().map(|entry| entry.name.clone());
+            let chosen = selected_diffuse(&drawable, &loaded);
+            self.texture_overrides.insert(slot, loaded.clone());
             self.textures.extend(loaded);
-            first
-        } else { None };
+            chosen
+        } else { self.texture_overrides.remove(&slot); None };
         self.drawables.retain(|(current, _, _)| *current != slot);
         self.drawables.push((slot, drawable, texture.clone()));
         self.slots[slot].drawable = ydd.file_name().map(|name| name.to_string_lossy().into_owned());
@@ -357,7 +384,7 @@ pub fn compose(index: &GameIndex, keys: Option<&GtaKeys>, name: &str, choices: &
         None => Vec::new(),
     };
 
-    let mut composed = Composed { name: init.name.clone(), slots: Vec::new(), textures: Vec::new(), warnings: Vec::new(), drawables: Vec::new(), rigs: HashMap::new() };
+    let mut composed = Composed { name: init.name.clone(), slots: Vec::new(), textures: Vec::new(), warnings: Vec::new(), drawables: Vec::new(), rigs: HashMap::new(), texture_overrides: HashMap::new() };
     let mut streamed_textures: Vec<YtdTexture> = Vec::new();
 
     for slot in 0..12 {
@@ -434,6 +461,33 @@ pub fn compose(index: &GameIndex, keys: Option<&GtaKeys>, name: &str, choices: &
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn texture(name: &str, pixel: u8) -> YtdTexture {
+        YtdTexture { name: name.into(), name_hash: rage_joaat(name), width: 1, height: 1, depth: 1, format: TextureFormat::A8R8G8B8, levels: 1, stride: 4, pixel_data: vec![pixel; 4] }
+    }
+    fn drawable() -> Drawable {
+        use rage_formats::{DrawableBounds, ShaderGroup, ShaderFx, ShaderParameter, ShaderParameterValue, Vec3};
+        let zero = Vec3 { x: 0., y: 0., z: 0. };
+        Drawable { name: "test".into(), name_hash: 0, bounds: DrawableBounds { center: zero, sphere_radius: 1., box_min: zero, box_max: zero }, lod_distances: [1.;4], render_masks: [0;4], lods: vec![],
+            shader_group: Some(ShaderGroup { textures: vec![texture("cloth_diff_000_a_uni", 30)], shaders: vec![ShaderFx { name_hash: 0, file_name_hash: 0, render_bucket: 0, render_bucket_mask: 0, parameter_count: 1, texture_parameter_count: 1, parameters: vec![ShaderParameter { name_hash: rage_joaat("DiffuseSampler"), data_type: 0, data_pointer: 0, value: ShaderParameterValue::Texture { name: "cloth_diff_000_a_uni".into(), name_hash: rage_joaat("cloth_diff_000_a_uni") } }] }] }) }
+    }
+    #[test]
+    fn selected_dictionary_matches_diffuse_instead_of_first_entry() {
+        let d = drawable();
+        let textures = vec![texture("normal_map", 10), texture("cloth_diff_000_a_uni", 20)];
+        assert_eq!(selected_diffuse(&d, &textures).as_deref(), Some("cloth_diff_000_a_uni"));
+        assert_eq!(selected_texture(&textures, Some("CLOTH_DIFF_000_A_UNI"), Some("normal_map")).unwrap().pixel_data, vec![20;4]);
+    }
+    #[test]
+    fn selected_slot_pixels_win_over_base_and_embedded_names_without_leaking() {
+        let d = drawable();
+        let scene = Composed { name: "test".into(), slots: vec![], warnings: vec![], textures: vec![texture("cloth_diff_000_a_uni", 10)], drawables: vec![], rigs: HashMap::new(), texture_overrides: [(3, vec![texture("cloth_diff_000_a_uni", 20)]), (4, vec![texture("cloth_diff_000_a_uni", 40)])].into_iter().collect() };
+        for (slot, expected, origin) in [(3,20,"selected-ytd"),(4,40,"selected-ytd"),(5,10,"ped-dictionary")] {
+            let (actual, source) = scene.resolve_texture(slot, &d, Some("cloth_diff_000_a_uni"), None).unwrap();
+            assert_eq!(actual.pixel_data, vec![expected;4]); assert_eq!(source, origin);
+        }
+        assert!(scene.resolve_texture(3, &d, Some("missing"), None).is_none());
+    }
 
     #[test]
     fn scene_bc3_keeps_four_colors_for_ascending_endpoints() {

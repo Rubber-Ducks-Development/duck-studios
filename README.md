@@ -13,7 +13,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20x64-0078D4?style=flat-square" alt="Platform: Windows x64">
   <img src="https://img.shields.io/badge/built%20with-.NET%2010%20%2B%20Rust-D7B974?style=flat-square" alt="Built with .NET 10 + Rust">
-  <img src="https://img.shields.io/badge/source-2.1.8-555555?style=flat-square" alt="Source version 2.1.8">
+  <img src="https://img.shields.io/badge/source-2.1.9-555555?style=flat-square" alt="Source version 2.1.9">
   <img src="https://img.shields.io/badge/license-MIT-3A3A3A?style=flat-square" alt="License: MIT; third-party notices apply">
 </p>
 

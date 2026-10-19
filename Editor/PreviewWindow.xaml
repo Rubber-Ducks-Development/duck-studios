@@ -27,7 +27,7 @@
           <TabItem Header="Options"><ScrollViewer><StackPanel Margin="4,12,8,10">
             <TextBlock Text="Rendering" FontWeight="SemiBold" Margin="0,0,0,8"/>
             <TextBlock Text="Render mode"/><ComboBox x:Name="RenderModeBox" SelectionChanged="DisplayOptionChanged" Margin="0,4,0,12"><ComboBoxItem Content="Textured"/><ComboBoxItem Content="Solid"/></ComboBox>
-            <TextBlock Text="Background"/><ComboBox x:Name="BackgroundBox" SelectionChanged="DisplayOptionChanged" Margin="0,4,0,12"><ComboBoxItem Content="Durty blue"/><ComboBoxItem Content="Dark studio"/><ComboBoxItem Content="Neutral gray"/></ComboBox>
+            <TextBlock Text="Background"/><ComboBox x:Name="BackgroundBox" SelectionChanged="DisplayOptionChanged" Margin="0,4,0,12"><ComboBoxItem Content="Duck Blue"/><ComboBoxItem Content="Dark studio"/><ComboBoxItem Content="Neutral gray"/></ComboBox>
             <TextBlock Text="Light direction"/><Slider x:Name="LightSlider" Minimum="0" Maximum="360" Value="45" ValueChanged="LightDirectionChanged" Margin="0,4,0,12"/>
             <TextBlock Text="Preview" FontWeight="SemiBold" Margin="0,0,0,8"/>
             <CheckBox x:Name="GridBox" Content="Grid" Checked="DisplayOptionChanged" Unchecked="DisplayOptionChanged"/>
@@ -47,16 +47,16 @@
             <TextBlock x:Name="PedStatusText" Text="A local GTA V installation is used for the full PED preview." Foreground="#555555" Margin="0,10,0,0"/>
           </StackPanel></ScrollViewer></TabItem>
           <TabItem Header="Models data"><ScrollViewer><StackPanel Margin="4,12,8,10"><TextBlock x:Name="ModelDataText" Text="Loading model..." LineHeight="20"/></StackPanel></ScrollViewer></TabItem>
-          <TabItem Header="Textures data"><ScrollViewer><StackPanel Margin="4,12,8,10"><TextBlock Text="Texture variation"/><ComboBox x:Name="TextureBox" SelectionChanged="TextureChanged" Margin="0,5,0,9"/><TextBlock x:Name="TextureDataText" Margin="0,0,0,12"/><Image x:Name="TextureImage" MaxHeight="210" Stretch="Uniform"/></StackPanel></ScrollViewer></TabItem>
+          <TabItem Header="Textures data"><ScrollViewer><StackPanel Margin="4,12,8,10"><TextBlock Text="Texture variation"/><ComboBox x:Name="TextureBox" SelectionChanged="TextureChanged" Margin="0,5,0,9"/><Button x:Name="TexturePhotosButton" Content="From photos..." Click="FromPhotosClick"/><TextBlock x:Name="TextureDataText" Margin="0,0,0,12"/><Image x:Name="TextureImage" MaxHeight="210" Stretch="Uniform"/></StackPanel></ScrollViewer></TabItem>
         </TabControl>
       </DockPanel>
     </Border>
-    <Grid Grid.Column="1" x:Name="PreviewSurface" ClipToBounds="True" Background="#356899">
-      <Viewport3D x:Name="PreviewViewport" ClipToBounds="True" MouseDown="ViewportMouseDown" MouseMove="ViewportMouseMove" MouseUp="ViewportMouseUp" MouseWheel="ViewportMouseWheel" SizeChanged="ViewportSizeChanged">
+    <Grid Grid.Column="1" x:Name="PreviewSurface" ClipToBounds="True" Background="#356899" MouseDown="ViewportMouseDown" MouseMove="ViewportMouseMove" MouseUp="ViewportMouseUp" MouseWheel="ViewportMouseWheel" LostMouseCapture="ViewportLostCapture">
+      <Viewport3D x:Name="PreviewViewport" ClipToBounds="True" SizeChanged="ViewportSizeChanged">
         <Viewport3D.Camera><PerspectiveCamera x:Name="PreviewCamera" Position="3,2,5" LookDirection="-3,-2,-5" FieldOfView="45" NearPlaneDistance="0.01"/></Viewport3D.Camera>
         <ModelVisual3D><ModelVisual3D.Content><Model3DGroup><AmbientLight x:Name="Ambient" Color="#A0B2BC"/><DirectionalLight x:Name="Sun" Color="#FFFFFF" Direction="-1,-1,-2"/><DirectionalLight Color="#778EA5" Direction="1,-0.5,1"/></Model3DGroup></ModelVisual3D.Content></ModelVisual3D>
       </Viewport3D>
-      <Button x:Name="OpenMenuButton" Content="&gt; Menu" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="15" Click="ToggleMenuClick" Width="75" Panel.ZIndex="2"/>
+      <WrapPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="15" Panel.ZIndex="2"><Button x:Name="OpenMenuButton" Content="&gt; Menu" Click="ToggleMenuClick" Width="75"/><Button x:Name="SurfacePhotosButton" Content="From photos..." Click="FromPhotosClick" Margin="8,0,0,6"/></WrapPanel>
       <TextBlock x:Name="HintText" Text="Loading 3D preview..." HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontSize="16" IsHitTestVisible="False"/>
       <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Background="#8A202B36" Padding="8,5" Margin="0,0,14,12" IsHitTestVisible="False"><TextBlock Text="DRAG TO ROTATE  /  SCROLL TO ZOOM" Foreground="White" FontSize="10"/></Border>
     </Grid>

@@ -40,7 +40,7 @@ public partial class MainWindow
         SyncItem();
         if (TextureViewer.Visibility == Visibility.Visible && SelectedTexturePath() is { } path && ResolveCorePath(false) is { } core)
         {
-            try { TextureImage.Source = CodeWalkerPreview.LoadTextureFile(path, core); }
+            try { TextureImage.Source = CodeWalkerPreview.LoadTextureFile(path, core, asset.TextureSources.GetValueOrDefault(path)?.TextureName, asset.ModelPath); }
             catch (Exception ex) { StatusText.Text = "Texture preview reload failed: " + ex.Message; }
         }
         if (hadPreview || WorkspaceTabs.SelectedIndex == 1)
@@ -66,9 +66,9 @@ public partial class MainWindow
         await ImportTexturesAsync(selected, files, index);
     }
 
-    private async Task ImportTexturesAsync(ClothingAsset asset, IEnumerable<string> files, int replacementIndex)
+    private async Task<int> ImportTexturesAsync(ClothingAsset asset, IEnumerable<string> files, int replacementIndex)
     {
-        if (textureImportBusy) return;
+        if (textureImportBusy) return -1;
         var current = project;
         var failures = new List<string>();
         int lastIndex = -1, imported = 0;
@@ -117,9 +117,10 @@ public partial class MainWindow
                         asset.TextureLabels.TryAdd(texture, Path.GetFileNameWithoutExtension(source));
                         textureReload.Remember(texture, source);
                     }
+                    PreviewDiagnostics.Record($"Imported texture for {asset.Name}: {source} -> {texture}; diffuse={link?.TextureName ?? "YTD dictionary"}; variation={lastIndex}");
                     imported++;
                 }
-                catch (Exception ex) { failures.Add(Path.GetFileName(source) + ": " + (ex.InnerException ?? ex).Message); }
+                catch (Exception ex) { PreviewDiagnostics.Record($"Texture import failed: {source}: {ex}"); failures.Add(Path.GetFileName(source) + ": " + (ex.InnerException ?? ex).Message); }
             }
             if (imported > 0 && ReferenceEquals(current, project))
             {
@@ -131,5 +132,6 @@ public partial class MainWindow
             if (failures.Count > 0) MessageBox.Show(this, string.Join("\n", failures), "Texture import", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally { textureImportBusy = false; AddTextureButton.IsEnabled = RemoveTextureButton.IsEnabled = selected != null; }
+        return imported > 0 ? lastIndex : -1;
     }
 }

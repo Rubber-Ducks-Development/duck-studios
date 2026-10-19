@@ -20,6 +20,9 @@ public partial class MainWindow
         var index = TextureList.ItemContainerGenerator.IndexFromContainer(row);
         if (index < 0 || index >= selected.TexturePaths.Count) return;
         var path = selected.TexturePaths[index];
+        var asset = selected;
+        var preferred = asset.TextureSources.GetValueOrDefault(path)?.TextureName;
+        var cacheKey = path + "|" + asset.ModelPath + "|" + preferred;
         var core = ResolveCorePath(false);
         var panel = new StackPanel { Width = 260 };
         var heading = new TextBlock { Text = Path.GetFileName(path), Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, FontSize = 11 };
@@ -32,7 +35,7 @@ public partial class MainWindow
             if (core == null) throw new IOException("CodeWalker.Core.dll is missing from the app folder.");
             var info = new FileInfo(path);
             BitmapSource? bitmap;
-            if (thumbnailCache.TryGetValue(path, out var cached) && cached.Ticks == info.LastWriteTimeUtc.Ticks && cached.Length == info.Length)
+            if (thumbnailCache.TryGetValue(cacheKey, out var cached) && cached.Ticks == info.LastWriteTimeUtc.Ticks && cached.Length == info.Length)
                 bitmap = cached.Bitmap;
             else
             {
@@ -40,7 +43,7 @@ public partial class MainWindow
                 {
                     lock (thumbnailDecodeGate)
                     {
-                        var full = CodeWalkerPreview.LoadTextureFile(path, core);
+                        var full = CodeWalkerPreview.LoadTextureFile(path, core, preferred, asset.ModelPath);
                         if (full == null) return null;
                         var opaque = PreviewTexture.ForMaterial(full, PreviewTexture.AlphaMode.Opaque);
                         var scale = Math.Min(1, 512d / Math.Max(opaque.PixelWidth, opaque.PixelHeight));
@@ -50,14 +53,14 @@ public partial class MainWindow
                 if (bitmap != null)
                 {
                     if (thumbnailCache.Count >= 24) thumbnailCache.Clear();
-                    thumbnailCache[path] = (info.LastWriteTimeUtc.Ticks, info.Length, bitmap);
+                    thumbnailCache[cacheKey] = (info.LastWriteTimeUtc.Ticks, info.Length, bitmap);
                 }
             }
             if (bitmap == null) { status.Text = "No supported diffuse texture found."; return; }
             var preview = new Image { Source = bitmap, Width = 260, Height = 160, Stretch = Stretch.Uniform, Margin = new Thickness(0,10,0,0) };
             RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
             panel.Children.Insert(1, new Border { Background = new SolidColorBrush(Color.FromRgb(38,38,38)), Child = preview });
-            status.Text = ClothingAsset.FileSize(path) + (selected.TextureSources.TryGetValue(path, out var link) ? "\nLinked: " + link.SourcePath + "\nReloads when saved" : ""); status.TextWrapping = TextWrapping.Wrap;
+            status.Text = ClothingAsset.FileSize(path) + (asset.TextureSources.TryGetValue(path, out var link) ? "\nLinked: " + link.SourcePath + "\nReloads when saved" : ""); status.TextWrapping = TextWrapping.Wrap;
         }
         catch (Exception ex) { status.Text = "Texture preview unavailable: " + ex.Message; status.TextWrapping = TextWrapping.Wrap; }
     }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.9
+
+- Add Help > Preview debug report with selected variation, linked artwork, renderer errors and actual scene texture bindings. Reports can be refreshed, copied or saved without model/image contents.
+- Match each mesh to its diffuse texture in the selected YTD and keep selected clothing dictionaries separate from base PED dictionaries with matching texture names.
+- Match texture thumbnails to the linked artwork/model diffuse name and clear stale 3D visuals while loading another selection.
+- Rename Durty blue to Duck Blue and allow orbit/zoom from the entire preview background.
+- Add From photos to standalone and embedded 3D previews, using the existing linked-image importer and selecting the imported variation.
+
 ## 2.1.8
 
 - Launch the updater with a neutral working directory and release inherited installation-folder handles before replacement, including updates launched by older editors.

@@ -21,9 +21,9 @@ public sealed class StudioViewport : Grid
     {
         Background=new SolidColorBrush(Color.FromRgb(42,44,48));ClipToBounds=true;Viewport.Camera=camera;Children.Add(Viewport);
         var lights=new Model3DGroup();lights.Children.Add(new AmbientLight(Color.FromRgb(160,166,173)));lights.Children.Add(new DirectionalLight(Colors.White,new(-1,-1,-2)));lights.Children.Add(new DirectionalLight(Color.FromRgb(115,130,148),new(1,-.5,1)));Viewport.Children.Add(new ModelVisual3D{Content=lights});
-        Viewport.MouseDown+=(_,e)=>{if(e.ChangedButton==MouseButton.Left){invertPanning=AppSettings.Load().InvertPanning;drag=e.GetPosition(this);Viewport.CaptureMouse();}};Viewport.MouseUp+=(_,_)=>{drag=null;Viewport.ReleaseMouseCapture();};
-        Viewport.MouseMove+=(_,e)=>{if(drag==null||e.LeftButton!=MouseButtonState.Pressed)return;var p=e.GetPosition(this);orbit+=OrbitControls.HorizontalDelta(p.X-drag.Value.X,invertPanning);elevation=Math.Clamp(elevation+(p.Y-drag.Value.Y)*.008,-1.3,1.3);drag=p;UpdateCamera();};
-        Viewport.MouseWheel+=(_,e)=>{distance=Math.Clamp(distance*(e.Delta>0?.86:1.16),Fit()*.3,Fit()*12);UpdateCamera();e.Handled=true;};SizeChanged+=(_,_)=>{if(visual!=null)UpdateCamera();};
+        MouseDown+=(_,e)=>{if(e.ChangedButton==MouseButton.Left && OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, this)){invertPanning=AppSettings.Load().InvertPanning;drag=e.GetPosition(this);CaptureMouse();}};MouseUp+=(_,_)=>{drag=null;ReleaseMouseCapture();};
+        MouseMove+=(_,e)=>{if(drag==null||e.LeftButton!=MouseButtonState.Pressed)return;var p=e.GetPosition(this);orbit+=OrbitControls.HorizontalDelta(p.X-drag.Value.X,invertPanning);elevation=Math.Clamp(elevation+(p.Y-drag.Value.Y)*.008,-1.3,1.3);drag=p;UpdateCamera();};
+        MouseWheel+=(_,e)=>{if(!OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, this))return;distance=Math.Clamp(distance*(e.Delta>0?.86:1.16),Fit()*.3,Fit()*12);UpdateCamera();e.Handled=true;};LostMouseCapture+=(_,_)=>drag=null;SizeChanged+=(_,_)=>{if(visual!=null)UpdateCamera();};
     }
     public void Set(NativePreviewResult result,bool preserve=false)
     {

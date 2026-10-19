@@ -104,3 +104,10 @@ The updater runs outside the installation folder and releases inherited working-
 ## Studio 2 verification
 
 44 integration checks covered tattoo conversion/alpha/presets, all four targets, real RPF7 creation, source bundling, history restore independence, optimizer copies/downsize/deduplication, release signatures, corrupt-download rejection, atomic installation, preservation of personal projects and scoped uninstall. All new tool windows were rendered and inspected. Existing material, backup and panel regression checks remain part of the release workflow.
+
+
+### Preview troubleshooting
+
+Use Help > Preview debug report after reproducing a texture mismatch. Refresh, then copy or save the report for support. It records selected file names and linked artwork, renderer failures, and the resolved texture name/source for each material. The Windows profile prefix is redacted; review filenames before sharing. Reports contain no model or image data. Recent events are bounded and stay in memory until a report is saved.
+
+Drag or scroll anywhere on the preview background to rotate or zoom. From photos is available beside Menu, in Textures data, and in the main 3D Preview sidebar. Imported artwork becomes a linked YTD variation and is selected for preview. The blue background preset is named Duck Blue.

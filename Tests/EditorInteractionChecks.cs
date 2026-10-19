@@ -93,6 +93,7 @@ static class EditorInteractionChecks
         check(ProjectIO.Load(saved).Items.Select(a => a.Drawable).SequenceEqual(project.Items.Select(a => a.Drawable)), "Assigned positions survive project save and reopen");
         var preview = new PreviewWindow(male, settings, 7);
         check(((ComboBox)preview.FindName("TextureBox")).SelectedIndex == 7, "Separate preview opens with H instead of resetting to A");
+        PreviewDebugChecks(window, preview, male, root, check);
         ((ColumnDefinition)preview.FindName("MenuColumn")).Width = new GridLength(310);
         var content = (FrameworkElement)preview.Content;
         Layout(content, 900, 740);
@@ -141,6 +142,37 @@ static class EditorInteractionChecks
         Save(content, Path.Combine(root, "preview-tabs.png"), 900, 740);
         preview.Close();
         Call(window, "WindowClosed", window, EventArgs.Empty);
+    }
+    static void PreviewDebugChecks(MainWindow window, PreviewWindow preview, ClothingAsset asset, string root, Action<bool,string> check)
+    {
+        var surface = (Grid)preview.FindName("PreviewSurface");
+        Layout((FrameworkElement)preview.Content, 900, 740);
+        var empty = VisualTreeHelper.HitTest(surface, new Point(surface.ActualWidth - 10, 80))!.VisualHit;
+        check(OrbitControls.IsSurfaceInput(empty, surface), "Empty blue preview background receives orbit and zoom input");
+        var menu = (Button)preview.FindName("OpenMenuButton");
+        check(!OrbitControls.IsSurfaceInput(menu, surface), "Preview menu buttons do not start camera gestures");
+        var camera = (System.Windows.Media.Media3D.PerspectiveCamera)preview.FindName("PreviewCamera");
+        var before = (double)typeof(PreviewWindow).GetField("distance",Private)!.GetValue(preview)!;
+        surface.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,0,120){RoutedEvent=Mouse.MouseWheelEvent});
+        check((double)typeof(PreviewWindow).GetField("distance",Private)!.GetValue(preview)! < before, "Scrolling empty blue preview background zooms the camera");
+        check(((ComboBoxItem)((ComboBox)preview.FindName("BackgroundBox")).Items[0]).Content.ToString()=="Duck Blue", "Background option is branded Duck Blue");
+        var linked = asset.TexturePaths[7]; asset.TextureSources[linked] = new TextureSourceLink { SourcePath=Path.Combine(root,"chosen.png"), TextureName="chosen_diffuse" };
+        var id = PreviewDiagnostics.Begin(asset,linked,"regression");
+        var folder = Directory.CreateDirectory(Path.Combine(root,"DebugScene")).FullName;
+        File.WriteAllText(Path.Combine(folder,"scene.json"), "{\"meshes\":[{\"slot\":\"task\",\"texture_name\":\"chosen_diffuse\",\"shader_diffuse\":\"base_diffuse\",\"texture_origin\":\"selected-ytd\",\"texture\":\"slot9_chosen.png\"}]}");
+        PreviewDiagnostics.Complete(id,folder,"test renderer completed");
+        var report = PreviewDiagnostics.Report(Path.Combine(root,"uniform.dctproj"),asset,7);
+        check(report.Contains("SELECTED h") && report.Contains("chosen.png") && report.Contains("chosen_diffuse") && report.Contains("selected-ytd") && report.Contains("uniform.dctproj"), "Debug report identifies project, chosen H artwork and actual scene texture origin");
+        var profile=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        check(!report.Contains(profile,StringComparison.OrdinalIgnoreCase), "Debug reports redact the Windows profile directory");
+        for(var i=0;i<45;i++)PreviewDiagnostics.Record("bounded-event-"+i+"!");
+        report=PreviewDiagnostics.Report(null,null,-1);
+        check(!report.Contains("bounded-event-0!")&&report.Contains("bounded-event-44!"), "Preview diagnostic history remains bounded");
+        var dialog=new PreviewDebugWindow(()=>report);
+        Layout((FrameworkElement)dialog.Content,900,660); Save((FrameworkElement)dialog.Content,Path.Combine(root,"preview-debug-report.png"),900,660);dialog.Close();
+        var photos=new PreviewWindow(asset,new AppSettings(),7,(_,_)=>Task.FromResult(7));
+        check(((Button)photos.FindName("SurfacePhotosButton")).IsEnabled&&((Button)photos.FindName("TexturePhotosButton")).IsEnabled,"Photo import is available on the preview surface and Textures data tab");
+        photos.Close();
     }
     static void ScrollAndToolbarChecks(MainWindow window, ClothingProject project, string root, Action<bool, string> check)
     {

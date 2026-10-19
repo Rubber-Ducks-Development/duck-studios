@@ -352,6 +352,7 @@ public partial class MainWindow : Window
     {
         if (!EnsureProject()) return;
         var importedProject = durtyProject ? ResourceImporter.ImportDurtyProject(path) : ResourceImporter.Import(path);
+        PreviewDiagnostics.Record($"Imported {(durtyProject ? "DCT project" : "FiveM resource")}: {path}; adjacent resource: {importedProject.SourceResourcePath}; clothing count: {importedProject.Items.Count}");
         foreach (var asset in importedProject.Items) ClothingImport.Append(project.Items, asset);
         project.SourceResourcePath = "";
         projectPath = null;
@@ -692,6 +693,7 @@ public partial class MainWindow : Window
         start.Environment["HOME"] = dataHome;
         foreach (var arg in new[] { "--no-update-check", "--exe", Path.Combine(game, "GTA5.exe"), "ped-scene", "--ped", selected.Ped, "--override-slot", selected.Slot, "--override-ydd", selected.ModelPath, "-o", output }) start.ArgumentList.Add(arg);
         if (SelectedTexturePath() is { } ytd) { start.ArgumentList.Add("--override-ytd"); start.ArgumentList.Add(ytd); }
+        var diagnostic = PreviewDiagnostics.Begin(selected, SelectedTexturePath(), "embedded PED");
         RenderPedButton.IsEnabled = false;
         ClearModel();
         PreviewHint.Text = "Loading 3D PED from your GTA V installation...";
@@ -709,6 +711,7 @@ public partial class MainWindow : Window
             if (process.ExitCode != 0) throw new IOException(log);
             if (version != previewVersion) return;
             var scene = PedScenePreview.Load(output);
+            PreviewDiagnostics.Complete(diagnostic, output, log);
             activeModel = new ModelVisual3D { Content = scene.Model };
             ModelViewport.Children.Add(activeModel);
             activeSceneFolder = output;
@@ -717,7 +720,7 @@ public partial class MainWindow : Window
             if (preserveCamera) UpdateCamera(); else { orbitX = 0; orbitY = .05; ResetPreviewCamera(scene.Extent); }
             PreviewHint.Visibility = Visibility.Collapsed;
         }
-        catch (Exception ex) { if (version == previewVersion) { PreviewHint.Text = "PED preview unavailable"; ShowError(ex); } }
+        catch (Exception ex) { PreviewDiagnostics.Record($"[{diagnostic}] PED preview failed: {ex}"); if (version == previewVersion) { PreviewHint.Text = "PED preview unavailable"; ShowError(ex); } }
         finally { RenderPedButton.IsEnabled = true; if (activeSceneFolder != output) DeleteScene(output); }
     }
 
@@ -820,7 +823,7 @@ public partial class MainWindow : Window
     private void PreviewTabClick(object sender, RoutedEventArgs e)
     {
         if (selected == null) { MessageBox.Show("Select a drawable to preview.", "Duck Studio"); return; }
-        new PreviewWindow(selected, settings, TextureList.SelectedIndex) { Owner = this }.Show();
+        new PreviewWindow(selected, settings, TextureList.SelectedIndex, (asset, files) => ImportTexturesAsync(asset, files, -1)) { Owner = this }.Show();
     }
     private void SettingsClick(object sender, RoutedEventArgs e)
     {
@@ -901,6 +904,8 @@ public partial class MainWindow : Window
         start.Environment["HOME"] = dataHome;
         foreach (var arg in new[] { "--no-update-check", "asset-scene", "--ydd", selected.ModelPath, "-o", output }) start.ArgumentList.Add(arg);
         if (SelectedTexturePath() is { } ytd) { start.ArgumentList.Add("--ytd"); start.ArgumentList.Add(ytd); }
+        var diagnostic = PreviewDiagnostics.Begin(selected, SelectedTexturePath(), "embedded clothing");
+        ClearModel();
         PreviewHint.Text = "Loading item in 3D...";
         PreviewHint.Visibility = Visibility.Visible;
         try
@@ -913,6 +918,7 @@ public partial class MainWindow : Window
             if (process.ExitCode != 0) throw new IOException(log);
             if (version != previewVersion) return;
             var result = PedScenePreview.Load(output);
+            PreviewDiagnostics.Complete(diagnostic, output, log);
             ClearModel();
             activeModel = new ModelVisual3D { Content = result.Model };
             ModelViewport.Children.Add(activeModel);
@@ -924,6 +930,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            PreviewDiagnostics.Record($"[{diagnostic}] Clothing preview failed: {ex}");
             if (version == previewVersion)
             {
                 PreviewHint.Text = "Item preview unavailable";
@@ -949,7 +956,7 @@ public partial class MainWindow : Window
         {
             Cursor = Cursors.Wait;
             project.CodeWalkerCorePath = corePath;
-            var bitmap = CodeWalkerPreview.LoadTextureFile(ytd, corePath) ?? throw new NotSupportedException("This YTD texture format is not supported yet.");
+            var bitmap = CodeWalkerPreview.LoadTextureFile(ytd, corePath, selected?.TextureSources.GetValueOrDefault(ytd)?.TextureName, selected?.ModelPath) ?? throw new NotSupportedException("This YTD texture format is not supported yet.");
             TextureImage.Source = bitmap;
             TextureViewer.Visibility = Visibility.Visible;
         }
@@ -1018,15 +1025,17 @@ public partial class MainWindow : Window
         distance = Math.Max(distance, FitPreviewDistance() * .45);
         UpdateCamera();
     }
-    private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { if(e.ChangedButton == MouseButton.Left) { dragStart = e.GetPosition(ModelViewport); ModelViewport.CaptureMouse(); } }
+    private void ViewportMouseDown(object sender, MouseButtonEventArgs e) { if(e.ChangedButton == MouseButton.Left && OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, ModelSurface)) { dragStart = e.GetPosition(ModelSurface); ModelSurface.CaptureMouse(); e.Handled = true; } }
+    private void ViewportMouseUp(object sender, MouseButtonEventArgs e) { if(e.ChangedButton == MouseButton.Left) { dragStart = null; ModelSurface.ReleaseMouseCapture(); } }
+    private void ViewportLostCapture(object sender, MouseEventArgs e) => dragStart = null;
     private void ViewportMouseMove(object sender, MouseEventArgs e)
     {
-        if (dragStart == null || e.LeftButton != MouseButtonState.Pressed) { dragStart = null; ModelViewport.ReleaseMouseCapture(); return; }
-        var point = e.GetPosition(ModelViewport); orbitX += OrbitControls.HorizontalDelta(point.X - dragStart.Value.X, settings.InvertPanning); orbitY = Math.Clamp(orbitY + (point.Y - dragStart.Value.Y) * .008, -1.35, 1.35); dragStart = point; UpdateCamera();
+        if (dragStart == null || e.LeftButton != MouseButtonState.Pressed) { dragStart = null; ModelSurface.ReleaseMouseCapture(); return; }
+        var point = e.GetPosition(ModelSurface); orbitX += OrbitControls.HorizontalDelta(point.X - dragStart.Value.X, settings.InvertPanning); orbitY = Math.Clamp(orbitY + (point.Y - dragStart.Value.Y) * .008, -1.35, 1.35); dragStart = point; UpdateCamera();
     }
     private void ViewportMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (activeModel == null) return;
+        if (activeModel == null || !OrbitControls.IsSurfaceInput(e.OriginalSource as DependencyObject, ModelSurface)) return;
         var fit = FitPreviewDistance();
         distance = Math.Clamp(distance * (e.Delta > 0 ? .86 : 1.16), fit * .45, fit * 15);
         UpdateCamera();

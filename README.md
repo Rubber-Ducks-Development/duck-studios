@@ -23,7 +23,8 @@
   <a href="#features">Features</a> ·
   <a href="#file-support">File support</a> ·
   <a href="#build-from-source">Build from source</a> ·
-  <a href="#documentation">Documentation</a>
+  <a href="#documentation">Documentation</a> ·
+  <a href="#license-and-credits">Credits</a>
 </p>
 
 > [!NOTE]
@@ -215,6 +216,16 @@ for a concrete workflow improvement. Include the app version and a minimal examp
 you have permission to share. Report vulnerabilities privately through [SECURITY.md](SECURITY.md).
 
 ## License and credits
+
+Special thanks to **[Alexander Schmid (DurtyFree)](https://github.com/DurtyFree)**,
+creator of **[Durty Cloth Tool](https://gta.clothing/)**, for his work on GTA V
+clothing tools and the documentation that informed Duck Studio's clothing workflows.
+Explore his [official project](https://github.com/DurtyFree/durty-cloth-tool) and
+[documentation](https://docs.gta.clothing/).
+
+Duck Studio is independently maintained by Rubber Ducks Development. This credit
+acknowledges DurtyFree's work and does not imply affiliation with or endorsement
+by Durty Cloth Tool.
 
 The editor and installer use the [MIT license](LICENSE). The modified renderer
 retains its [Unlicense](Renderer/LICENSE); bundled dependencies retain their own

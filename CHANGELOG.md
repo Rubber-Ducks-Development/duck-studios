@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## 2.1.12
 
 - Preserve imported YTD dictionary lookup keys and keep the edited diffuse first instead of re-sorting entries by display-name hash. Previously an edited variation could export an auxiliary/template entry ahead of its intended color texture even though the preview displayed the edit.
 - Restore diffuse-first ordering when rebuilding linked image variations and preserve original model/YTD inputs.
-- Add an imported DCT resource regression covering four edits, save/reopen, rebuild, streamed texture pixels, lookup aliases and binary YMT variation filenames.
+- Add an imported DCT resource regression covering a full 26-variation drawable, four edits including Z, save/reopen, rebuild, streamed texture pixels, lookup aliases and binary YMT variation filenames.
 
 ## 2.1.11
 

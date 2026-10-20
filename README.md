@@ -13,17 +13,17 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20x64-0078D4?style=flat-square" alt="Platform: Windows x64">
   <img src="https://img.shields.io/badge/built%20with-.NET%2010%20%2B%20Rust-D7B974?style=flat-square" alt="Built with .NET 10 + Rust">
-  <img src="https://img.shields.io/badge/source-2.1.11-555555?style=flat-square" alt="Source version 2.1.11">
+  <img src="https://img.shields.io/badge/source-2.1.12-555555?style=flat-square" alt="Source version 2.1.12">
   <img src="https://img.shields.io/badge/license-MIT-3A3A3A?style=flat-square" alt="License: MIT; third-party notices apply">
 </p>
 
 <p align="center">
-  <a href="#get-started"><b>Get started</b></a> Â·
-  <a href="#screenshots">Screenshots</a> Â·
-  <a href="#features">Features</a> Â·
-  <a href="#file-support">File support</a> Â·
-  <a href="#build-from-source">Build from source</a> Â·
-  <a href="#documentation">Documentation</a> Â·
+  <a href="#get-started"><b>Get started</b></a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#file-support">File support</a> ·
+  <a href="#build-from-source">Build from source</a> ·
+  <a href="#documentation">Documentation</a> ·
   <a href="#license-and-credits">Credits</a>
 </p>
 
@@ -196,8 +196,8 @@ Two companion workspaces with a shared visual language and different production 
 
 | App | What it is for | Workspace | Source and downloads |
 | --- | --- | --- | --- |
-| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.duckproj` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) Â· [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
-| **Duck Workshop** | Vehicle UVs, light patterns, warning textures, metadata and handling comparison | `.duckworkshop` | [Repository](https://github.com/Rubber-Ducks-Development/duckworkshop) Â· [Releases](https://github.com/Rubber-Ducks-Development/duckworkshop/releases) |
+| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.duckproj` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) · [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
+| **Duck Workshop** | Vehicle UVs, light patterns, warning textures, metadata and handling comparison | `.duckworkshop` | [Repository](https://github.com/Rubber-Ducks-Development/duckworkshop) · [Releases](https://github.com/Rubber-Ducks-Development/duckworkshop/releases) |
 
 **Share images, keep projects separate.** Export a texture as PNG from Studio, inspect
 or edit it in Workshop, then replace the image in Studio. Workshop's transparent

@@ -19,10 +19,15 @@ static class ClothingExportChecks
         File.WriteAllText(Path.Combine(resource,"fxmanifest.lua"),"fx_version 'cerulean'\ngame 'gta5'");
         var stream=Directory.CreateDirectory(Path.Combine(resource,"stream")).FullName;
         File.Copy(model,Path.Combine(stream,"mp_m_freemode_01_mp_m_export_case^task_037_u.ydd"));
-        for(var i=0;i<5;i++)File.Copy(original,Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('a'+i)}_uni.ytd"));
+        for(var i=0;i<26;i++)File.Copy(original,Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('a'+i)}_uni.ytd"));
         var project=ResourceImporter.ImportDurtyProject(dct);project.Name="Export case";project.Collection="export_case";project.OutputFolder=folder;project.CodeWalkerCorePath=core;
         var asset=project.Items.Single();
-        for(int i=1;i<5;i++)PutDiffuseFirst(asset.TexturePaths[i],core);
+        var edited=new[]{1,7,24,25}; // B, H, Y and Z, including the last allowed variation.
+        check(asset.TexturePaths.Count==26&&!PackBuilder.ValidateAsset(asset,core).Any(),"All 26 imported A-Z variations are accepted");
+        asset.TexturePaths.Add(original);
+        check(PackBuilder.ValidateAsset(asset,core).Any(x=>x.Contains("more than 26")),"A 27th variation is rejected without changing the supported maximum");
+        asset.TexturePaths.RemoveAt(26);
+        foreach(var i in edited)PutDiffuseFirst(asset.TexturePaths[i],core);
         var originalHashes=asset.TexturePaths.Select(File.ReadAllBytes).ToArray();
         var window=new MainWindow();const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         typeof(MainWindow).GetField("project",flags)!.SetValue(window,project);
@@ -31,29 +36,29 @@ static class ClothingExportChecks
         for(int i=0;i<4;i++)
         {
             var image=Path.Combine(folder,$"edit-{i}.png");Write(image,colors[i]);
-            var task=(Task<int>)typeof(MainWindow).GetMethod("ImportTexturesAsync",flags)!.Invoke(window,[asset,new[]{image},i+1])!;
-            typeof(RealPreviewChecks).GetMethod("Pump",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,[task]);check(task.Result==i+1,"DCT variation replacement selects edited row "+(i+1));
+            var task=(Task<int>)typeof(MainWindow).GetMethod("ImportTexturesAsync",flags)!.Invoke(window,[asset,new[]{image},edited[i]])!;
+            typeof(RealPreviewChecks).GetMethod("Pump",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,[task]);check(task.Result==edited[i],"DCT variation replacement selects edited row "+(edited[i]));
         }
         typeof(MainWindow).GetMethod("WindowClosed",flags)!.Invoke(window,[window,EventArgs.Empty]);
-        for(int i=1;i<5;i++)check(CodeWalkerPreview.TextureNames(asset.TexturePaths[i],core).First()==CodeWalkerPreview.TextureNames(original,core).First(),"Editing keeps the intended diffuse first for variation "+i);
-        for(int i=1;i<5;i++)check(Keys(asset.TexturePaths[i],core).SequenceEqual(Keys(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('a'+i)}_uni.ytd"),core)),"Editing preserves imported dictionary lookup aliases "+i);
+        foreach(var i in edited)check(CodeWalkerPreview.TextureNames(asset.TexturePaths[i],core).First()==CodeWalkerPreview.TextureNames(original,core).First(),"Editing keeps the intended diffuse first for variation "+i);
+        foreach(var i in edited)check(Keys(asset.TexturePaths[i],core).SequenceEqual(Keys(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('a'+i)}_uni.ytd"),core)),"Editing preserves imported dictionary lookup aliases "+i);
         var saved=Path.Combine(folder,"saved.duckproj");ProjectIO.Save(project,saved);project=ProjectIO.Load(saved);project.CodeWalkerCorePath=core;project.OutputFolder=folder;
         // Simulate a cache from an earlier importer with an auxiliary entry first.
-        foreach(var texture in project.Items.Single().TexturePaths.Skip(1))Rotate(texture,core);
+        foreach(var i in edited)Rotate(project.Items.Single().TexturePaths[i],core);
         var output=PackBuilder.Build(project,folder);var built=Path.Combine(output,"FiveM","export_case");
         var imported=ResourceImporter.Import(built);var exported=imported.Items.Single();
-        check(exported.TexturePaths.Count==5,"FiveM export retains original plus all four edited variations");
-        check(File.ReadAllBytes(exported.TexturePaths[0]).SequenceEqual(originalHashes[0]),"Untouched Durty variation remains byte-for-byte unchanged in stream");
+        check(exported.TexturePaths.Count==26,"FiveM export retains all 26 variations after four replacements");
+        foreach(var i in Enumerable.Range(0,26).Except(edited))check(File.ReadAllBytes(exported.TexturePaths[i]).SequenceEqual(originalHashes[i]),"Untouched Durty variation remains byte-for-byte unchanged in stream "+(char)('a'+i));
         for(int i=0;i<4;i++)
         {
-            var color=Pixel(CodeWalkerPreview.LoadTextureFile(exported.TexturePaths[i+1],core,modelPath:exported.ModelPath)!);
-            check(color.R==colors[i].R&&color.G==colors[i].G&&color.B==colors[i].B,"Exported FiveM variation contains distinct edited pixels "+(i+1));
-            var first=CodeWalkerPreview.TextureNames(exported.TexturePaths[i+1],core).First();
-            var streamed=Pixel(CodeWalkerPreview.LoadTextureFile(exported.TexturePaths[i+1],core,textureName:first)!);
-            check(streamed.R==colors[i].R&&streamed.G==colors[i].G&&streamed.B==colors[i].B,"First streamed YTD entry contains the edit, not the template/default pixels "+(i+1));
-            check(Pixels(exported.TexturePaths[i+1],core,1).SequenceEqual(Pixels(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('b'+i)}_uni.ytd"),core,1)),"Auxiliary map pixel bytes remain unchanged after edit and export "+(i+1));
-            check(Keys(exported.TexturePaths[i+1],core).SequenceEqual(Keys(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('b'+i)}_uni.ytd"),core)),"Build repairs entry order while retaining original lookup aliases "+(i+1));
-            check(File.ReadAllBytes(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('b'+i)}_uni.ytd")).SequenceEqual(originalHashes[i+1]),"Editing and export leave original DCT YTD untouched "+(i+1));
+            var color=Pixel(CodeWalkerPreview.LoadTextureFile(exported.TexturePaths[edited[i]],core,modelPath:exported.ModelPath)!);
+            check(color.R==colors[i].R&&color.G==colors[i].G&&color.B==colors[i].B,"Exported FiveM variation contains distinct edited pixels "+(edited[i]));
+            var first=CodeWalkerPreview.TextureNames(exported.TexturePaths[edited[i]],core).First();
+            var streamed=Pixel(CodeWalkerPreview.LoadTextureFile(exported.TexturePaths[edited[i]],core,textureName:first)!);
+            check(streamed.R==colors[i].R&&streamed.G==colors[i].G&&streamed.B==colors[i].B,"First streamed YTD entry contains the edit, not the template/default pixels "+(edited[i]));
+            check(Pixels(exported.TexturePaths[edited[i]],core,1).SequenceEqual(Pixels(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('a'+edited[i])}_uni.ytd"),core,1)),"Auxiliary map pixel bytes remain unchanged after edit and export "+(edited[i]));
+            check(Keys(exported.TexturePaths[edited[i]],core).SequenceEqual(Keys(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('a'+edited[i])}_uni.ytd"),core)),"Build repairs entry order while retaining original lookup aliases "+(edited[i]));
+            check(File.ReadAllBytes(Path.Combine(stream,$"mp_m_freemode_01_mp_m_export_case^task_diff_037_{(char)('a'+edited[i])}_uni.ytd")).SequenceEqual(originalHashes[edited[i]]),"Editing and export leave original DCT YTD untouched "+(edited[i]));
         }
         var assembly=Assembly.LoadFrom(core);var pedType=assembly.GetType("CodeWalker.GameFiles.PedFile",true)!;
         var rpfType=assembly.GetType("CodeWalker.GameFiles.RpfFile",true)!;
@@ -65,7 +70,7 @@ static class ClothingExportChecks
         // CodeWalker leaves the first component's type at zero; supply the
         // known slot before asking it to resolve the decoded texture suffixes.
         drawable.GetType().GetProperty("ComponentType")!.SetValue(drawable,9);
-        for(int i=0;i<5;i++)
+        for(int i=0;i<26;i++)
         {
             var name=(string)drawable.GetType().GetMethod("GetTextureName")!.Invoke(drawable,[i])!;
             check(exported.TexturePaths.Any(p=>Path.GetFileNameWithoutExtension(p).EndsWith("^"+name)),"Binary YMT resolves actual exported variation filename "+i+" ("+name+"; actual "+Path.GetFileName(exported.TexturePaths[i])+")");

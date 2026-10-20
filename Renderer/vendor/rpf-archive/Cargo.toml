@@ -40,7 +40,7 @@ name = "rpf_archive"
 path = "src/lib.rs"
 
 [dependencies.aes]
-version = "0.8"
+version = "0.9"
 
 [dependencies.anyhow]
 version = "1.0"

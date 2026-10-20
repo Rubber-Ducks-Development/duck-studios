@@ -18,12 +18,12 @@
 </p>
 
 <p align="center">
-  <a href="#get-started"><b>Get started</b></a> ·
-  <a href="#screenshots">Screenshots</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#file-support">File support</a> ·
-  <a href="#build-from-source">Build from source</a> ·
-  <a href="#documentation">Documentation</a> ·
+  <a href="#get-started"><b>Get started</b></a> Â·
+  <a href="#screenshots">Screenshots</a> Â·
+  <a href="#features">Features</a> Â·
+  <a href="#file-support">File support</a> Â·
+  <a href="#build-from-source">Build from source</a> Â·
+  <a href="#documentation">Documentation</a> Â·
   <a href="#license-and-credits">Credits</a>
 </p>
 
@@ -196,8 +196,8 @@ Two companion workspaces with a shared visual language and different production 
 
 | App | What it is for | Workspace | Source and downloads |
 | --- | --- | --- | --- |
-| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.duckproj` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) · [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
-| **Duck Workshop** | Vehicle UVs, light patterns, warning textures, metadata and handling comparison | `.duckworkshop` | [Repository](https://github.com/Rubber-Ducks-Development/duckworkshop) · [Releases](https://github.com/Rubber-Ducks-Development/duckworkshop/releases) |
+| **Duck Studio** | Clothing collections, tattoos, outfits, texture workflows and pack builds | `.duckproj` | [Repository](https://github.com/Rubber-Ducks-Development/duck-studios) Â· [Releases](https://github.com/Rubber-Ducks-Development/duck-studios/releases) |
+| **Duck Workshop** | Vehicle UVs, light patterns, warning textures, metadata and handling comparison | `.duckworkshop` | [Repository](https://github.com/Rubber-Ducks-Development/duckworkshop) Â· [Releases](https://github.com/Rubber-Ducks-Development/duckworkshop/releases) |
 
 **Share images, keep projects separate.** Export a texture as PNG from Studio, inspect
 or edit it in Workshop, then replace the image in Studio. Workshop's transparent

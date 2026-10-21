@@ -30,7 +30,7 @@ jobs:
           build-mode: manual
       - run: dotnet build Editor/WeftStudio.csproj -c Release
       - run: dotnet build Installer/DuckStudio.Setup.csproj -c Release -p:BrandingRoot="${{ github.workspace }}/Editor/Assets"
-      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
   dependencies:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

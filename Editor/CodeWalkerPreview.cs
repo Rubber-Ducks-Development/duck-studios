@@ -240,6 +240,12 @@ public static partial class CodeWalkerPreview
         var ydd = Activator.CreateInstance(yddType)!;
         yddType.GetMethod("Load", [typeof(byte[])])!.Invoke(ydd, [File.ReadAllBytes(modelPath)]);
         if (Member(ydd, "Drawables") is not Array drawables) return names;
+        return MaterialTextureNames(drawables, diffuse);
+    }
+
+    private static List<string> MaterialTextureNames(Array drawables, bool diffuse)
+    {
+        var names = new List<string>();
         foreach (var drawable in drawables)
         {
             if (drawable == null || Member(drawable, "ShaderGroup") is not { } group || Member(group, "Shaders") is not { } shaderList || Member(shaderList, "data_items") is not Array shaders) continue;

@@ -12,6 +12,7 @@ public sealed record LodStatistics(string Level,int Vertices,int Triangles,int M
     public override string ToString()=>$"{Level}: {Triangles:N0} triangles / {Vertices:N0} vertices / {Meshes} meshes";
 }
 public sealed record ModelInspection(List<LodStatistics> Lods,int Bones,List<string> DiffuseNames,bool HasWeights);
+public sealed record ClothingInspection(ModelInspection Model, List<string> EmbeddedNames, List<string> AuxiliaryNames);
 public static partial class CodeWalkerPreview
 {
     public static byte[] CompileDrawableXml(string xml,string inputFolder,string coreDll,string? preserveMaterialsFrom=null)
@@ -33,15 +34,53 @@ public static partial class CodeWalkerPreview
     }
     public static List<string> TextureNames(string path,string coreDll)=>Textures(ReadYtd(path,coreDll)).Cast<object>().Select(t=>Member(t,"Name")?.ToString()??"").ToList();
     public static ModelInspection InspectModel(string path,string coreDll)
+        => InspectClothing(path, coreDll).Model;
+
+    // Count binary buffers directly. XML export formats every vertex as text and
+    // can expand a small clothing dictionary into hundreds of MB of temporary data.
+    public static ClothingInspection InspectClothing(string path, string coreDll)
     {
-        var doc=XDocument.Parse(ExportXmlFile(path,"",coreDll));
-        var lods=new List<LodStatistics>();
-        foreach(var level in ModelTools.Levels)
+        EnsureCore(coreDll);
+        var type = core!.GetType("CodeWalker.GameFiles.YddFile", true)!;
+        var file = Activator.CreateInstance(type)!;
+        type.GetMethod("Load", [typeof(byte[])])!.Invoke(file, [File.ReadAllBytes(path)]);
+        if (Member(file, "Drawables") is not Array drawables || drawables.Length == 0)
+            throw new InvalidDataException("YDD has no drawable.");
+        var vertices = new int[4]; var triangles = new int[4]; var meshes = new int[4];
+        var bones = 0; var weights = false;
+        foreach (var drawable in drawables)
         {
-            var meshes=doc.Descendants(level).Descendants("Geometries").Elements("Item").ToList();
-            lods.Add(new(level.Replace("DrawableModels",""),meshes.Sum(m=>ModelTools.Rows(m).Length),meshes.Sum(m=>ModelTools.Indices(m).Length/3),meshes.Count));
+            if (drawable == null) continue;
+            if (Member(drawable, "Skeleton") is { } skeleton)
+                bones += Member(skeleton, "Bones") is { } block && Member(block, "Items") is Array items
+                    ? items.Length : Convert.ToInt32(Member(skeleton, "BonesCount") ?? 0);
+            if (Member(drawable, "DrawableModels") is not { } models) continue;
+            var levels = new[] { "High", "Med", "Low", "VLow" };
+            for (var level = 0; level < levels.Length; level++)
+            {
+                if (Member(models, levels[level]) is not Array rows) continue;
+                foreach (var row in rows)
+                {
+                    if (row == null || Member(row, "Geometries") is not Array geometries) continue;
+                    foreach (var geometry in geometries)
+                    {
+                        if (geometry == null) continue;
+                        meshes[level]++;
+                        var data = Member(geometry, "VertexData");
+                        var buffer = Member(geometry, "VertexBuffer");
+                        vertices[level] += Convert.ToInt32(data != null ? Member(data, "VertexCount") ?? 0
+                            : buffer != null ? Member(buffer, "VertexCount") ?? 0 : Member(geometry, "VerticesCount") ?? 0);
+                        var indices = Member(geometry, "IndexBuffer");
+                        triangles[level] += (indices != null && Member(indices, "Indices") is Array array
+                            ? array.Length : Convert.ToInt32(Member(geometry, "IndicesCount") ?? 0)) / 3;
+                        var declaration = buffer == null ? null : Member(buffer, "Info");
+                        weights |= declaration != null && (Convert.ToUInt32(Member(declaration, "Flags") ?? 0) & (1u << 1)) != 0;
+                    }
+                }
+            }
         }
-        return new(lods,doc.Descendants("Bones").Elements("Item").Count(),DiffuseTextureNames(path),doc.Descendants("Layout").Elements("BlendWeights").Any());
+        var lods = Enumerable.Range(0, 4).Select(i => new LodStatistics(ModelTools.Levels[i].Replace("DrawableModels", ""), vertices[i], triangles[i], meshes[i])).ToList();
+        return new(new(lods, bones, MaterialTextureNames(drawables, true), weights), EmbeddedTextureNames(drawables), MaterialTextureNames(drawables, false));
     }
 }
 

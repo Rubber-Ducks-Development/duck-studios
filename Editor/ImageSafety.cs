@@ -13,7 +13,7 @@ public static class ImageSafety
               <policy domain="delegate" rights="none" pattern="*" />
               <policy domain="filter" rights="none" pattern="*" />
               <policy domain="module" rights="none" pattern="*" />
-              <policy domain="module" rights="read|write" pattern="{JPEG,PNG,PSD,WEBP,BMP,TIFF,GIF,TGA,DDS,HEIC,JP2,PCX,PNM,QOI,EXR,HDR,ICON,JXL,BGR,RGB,XC}" />
+              <policy domain="module" rights="read|write" pattern="{JPEG,PNG,PSD,WEBP,BMP,DIB,TIFF,TIF,GIF,TGA,DDS,HEIC,JP2,PCX,PNM,QOI,EXR,HDR,ICON,JXL,BGR,RGB,XC}" />
               <policy domain="path" rights="none" pattern="@*" />
               <policy domain="path" rights="none" pattern="|*" />
               <policy domain="resource" name="width" value="16384" />

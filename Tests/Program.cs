@@ -9,8 +9,9 @@ static class Program
 {
     static int checks;
     static void Check(bool ok,string message){if(!ok)throw new Exception(message);checks++;Console.WriteLine("PASS "+message);}
-    [STAThread]static void Main()
+    [STAThread]static void Main(string[] args)
     {
+        if (PerformanceChecks.RunReaderFixture(args)) return;
         var root=Path.Combine(Environment.GetEnvironmentVariable("DUCK_STUDIO_TEST_ROOT")??Path.Combine(Environment.CurrentDirectory,"work","DuckStudioTests"),Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
         var model=Path.Combine(root,"model.ydd");var texture=Path.Combine(root,"texture.ytd");var image=Path.Combine(root,"art.png");File.WriteAllBytes(model,[1,2,3]);File.WriteAllBytes(texture,[4,5,6]);File.WriteAllBytes(image,[7,8,9]);
         var asset=new ClothingAsset{Name="Vest",Slot="task",Drawable=12,ModelPath=model,TexturePaths=[texture],TextureSources=new(){[texture]=new(){SourcePath=image,TextureName="vest"}}};
@@ -38,6 +39,8 @@ static class Program
         Check(DiffuseBinding.Select(["FF1","FF2"],["cloth"],[])==null,"Ambiguous color maps require an exact binding");
         Check(DiffuseBinding.Select(["FF1","cloth"],["CLOTH"],[])=="cloth","Exact material binding takes precedence over other color maps");
         ProjectFileChecks.Run(root,Check);
+        PackReplacementChecks.Run(root,Check);
+        PerformanceChecks.Run(root,Check);
         SecurityChecks.Run(root,Check);
         InstallerUpdateChecks.Run(root,Check);
         Environment.SetEnvironmentVariable("WEFT_STUDIO_DATA_HOME", Path.Combine(root, "EditorSettings"));

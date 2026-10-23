@@ -42,7 +42,7 @@ public partial class MainWindow
     }
     private async void BackupTick(object? sender, EventArgs e)
     {
-        if (closePending) return;
+        if (closePending || buildBusy || !IsEnabled) return;
         try { await BackupAsync(); } catch (Exception) { /* Failure remains visible in the footer. */ }
     }
     private void OpenBackupsClick(object sender, RoutedEventArgs e)
@@ -90,6 +90,7 @@ public partial class MainWindow
     {
         if (closeApproved) return;
         e.Cancel = true;
+        if (buildBusy) { StatusText.Text = "Wait for the build or close its options dialog before closing Duck Studio."; return; }
         if (closePending) return;
         closePending = true;
         try

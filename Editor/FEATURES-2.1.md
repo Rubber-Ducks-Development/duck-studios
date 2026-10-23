@@ -14,6 +14,24 @@ The installer offers Open With for all four extensions and keeps other apps' def
 
 Imported YTD image replacements preserve dictionary lookup keys and keep the edited color texture first for streamed clothing. Builds refresh linked images before exporting each variation; original DCT resources remain unchanged.
 
+## Replacement packs
+
+Build Project > **Pack mode (advanced)** chooses how the clothing collection is named:
+
+- **Add-on (own collection):** the default. Clothing is built into `mp_m_<DLC name>` / `mp_f_<DLC name>`.
+- **Replace a GTA DLC collection:** pick a DLC from your GTA V installation, for example mpheist (`mp_m_heist` / `mp_f_heist`). Scan GTA reads the freemode YMT names from every pack under `update/x64/dlcpacks`, so the list matches your game build. Link GTA5.exe in Settings first.
+- **Replace a custom collection:** enter the male and female collection names yourself, for example to replace another resource's add-on pack.
+
+Add and edit clothing as usual. The build streams the YMT, models and textures under the replaced collection's names (`mp_m_freemode_01_mp_m_heist.ymt`, `mp_m_freemode_01_mp_m_heist^jbib_000_u.ydd` and so on), so your items become drawables 0, 1, 2... of that collection in position order and appear where the original collection sits in clothing menus, not at the end. Replacement packs have no shop meta or `data_file` lines: registering the DLC's collection name again would make GTA add a second collection after every DLC instead of replacing the original.
+
+A replacement pack takes over the complete collection, not single items. The original items are no longer available, and a collection with fewer drawables than the original leaves the higher numbers empty. Deploy the whole resource and test each gender on your server's game build. Replacement packs build for FiveM and raw game assets; alt:V and single-player builds are refused.
+
+Builds run in the background. The footer shows the current phase or file while editing is paused; the window keeps its normal colors and continues to repaint. Choose **Cancel build** or press **Escape** to stop. Artwork conversion uses independent build textures, and optional ZIP compression also runs off the UI thread. Incomplete ZIPs are removed when cancelled; completed exports remain available.
+
+Model validation reads binary geometry counts directly and reuses inspection results within a pass. It runs in a separate headless process, so native decoding and large temporary allocations cannot suspend the editor's renderer. Per-model and per-texture status identifies the current input. Cancellation terminates the worker, and a two-minute timeout reports the last step if validation exceeds its limit.
+
+DLC discovery shows elapsed scan time and offers **Stop scan**. Closing the build dialog or changing away from DLC replacement stops its reader. Scans time out after five minutes. Successful discovery is cached across app launches and rechecked against the game executable, reader and DLC archive inventory; **Scan GTA** forces a fresh read. Installations with linked DLC folders bypass the cache so changes inside those folders cannot leave stale results.
+
 ## Editor tools
 
 - **Edit > Undo / Redo:** up to 100 project editing steps, including names, deleted items, texture replacements, tattoo changes, batch edits and optimization. Asset contents are captured independently. A restored image stays linked to its original source if that source still matches the saved content; changed artwork is restored as an independent working copy. New edits clear redo. Ctrl+Z / Ctrl+Y work in the workspace; text fields retain their native text undo.

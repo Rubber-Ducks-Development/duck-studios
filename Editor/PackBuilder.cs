@@ -22,6 +22,7 @@ public static class PackBuilder
         if(p.Collection.Equals("duckstudio_test",StringComparison.OrdinalIgnoreCase))issues.Add("Choose a different collection name: duckstudio_test is reserved for the FiveM test companion.");
         if (p.Items.Count == 0 && p.Tattoos.Count==0) issues.Add("Add at least one drawable or tattoo.");
         issues.AddRange(TattooBuilder.Validate(p));
+        issues.AddRange(PackReplacement.Validate(p));
         foreach (var a in p.Items)
         {
             var itemIssues = ValidateAsset(a, p.CodeWalkerCorePath);
@@ -78,7 +79,7 @@ public static class PackBuilder
             if (!File.Exists(f)) issues.Add($"Missing file: {f}");
         return issues;
     }
-    private static string Dlc(ClothingProject p, string ped) => (ped.Contains("mp_f_") ? "mp_f_" : "mp_m_") + p.Collection;
+    private static string Dlc(ClothingProject p, string ped) => PackReplacement.Collection(p, ped);
     private static (int Id, string Name) Anchor(string slot) => slot switch { "p_head" => (0,"ANCHOR_HEAD"), "p_eyes" => (1,"ANCHOR_EYES"), "p_ears" => (2,"ANCHOR_EARS"), "p_lwrist" => (6,"ANCHOR_LEFT_WRIST"), _ => (7,"ANCHOR_RIGHT_WRIST") };
     private static string Suffix(ClothingAsset a) => Regex.Match(Path.GetFileName(a.ModelPath), @"_([urm])(?:_\d+)?\.ydd$",RegexOptions.IgnoreCase) is { Success:true } m ? m.Groups[1].Value.ToLowerInvariant() : "u";
     private static string Skin(string path) => Regex.Match(path,@"_([a-z]{3})\.ytd$",RegexOptions.IgnoreCase) is { Success:true } m && Skins.Contains(m.Groups[1].Value.ToLowerInvariant()) ? m.Groups[1].Value.ToLowerInvariant() : "uni";
@@ -133,17 +134,31 @@ public static class PackBuilder
         }
         return new XDocument(new XElement("ShopPedApparel",new XElement("pedName",ped),new XElement("dlcName",Dlc(p,ped)),new XElement("fullDlcName",ped+"_"+Dlc(p,ped)),new XElement("eCharacter",ped.Contains("mp_f_")?"SCR_CHAR_MULTIPLAYER_F":"SCR_CHAR_MULTIPLAYER"),new XElement("creatureMetaData","mp_creaturemetadata_"+p.Collection),new XElement("pedOutfits"),new XElement("pedComponents",components),new XElement("pedProps",props)));
     }
-    public static string Build(ClothingProject p,string parent,BuildOptions? options=null)
+    public static string Build(ClothingProject p,string parent,BuildOptions? options=null,IProgress<string>? progress=null,CancellationToken cancellation=default,bool isolateValidation=false)
     {
+        cancellation.ThrowIfCancellationRequested();
         options ??= new BuildOptions();
         if(!Enum.IsDefined(options.Target))throw new InvalidDataException("Unknown build target.");
+        if(PackReplacement.TargetIssue(p,options.Target) is { } targetIssue)throw new InvalidOperationException(targetIssue);
         var imageCore=File.Exists(p.CodeWalkerCorePath)?p.CodeWalkerCorePath:Path.Combine(AppContext.BaseDirectory,"CodeWalker.Core.dll");
         foreach(var asset in p.Items)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            progress?.Report("Preparing textures: " + asset.Name);
             foreach(var pair in asset.TextureSources.Where(x=>asset.TexturePaths.Contains(x.Key)))
                 pair.Value.TextureName=TextureImport.Convert(pair.Value.SourcePath,pair.Key,imageCore,asset.ModelPath,pair.Key,pair.Value.TextureName,pair.Value.MaxDimension,pair.Value.CompressDiffuse);
+        }
+        progress?.Report("Preparing tattoo artwork...");
         TattooBuilder.Prepare(p,imageCore);
-        var issues=Validate(p); if(issues.Count>0) throw new InvalidOperationException(string.Join(Environment.NewLine,issues));
-        var modelErrors=ProjectValidation.Analyze(p,imageCore).Where(f=>f.Severity=="Error").ToList();
+        progress?.Report("Validating models and textures...");
+        // Basic validation can decode embedded-only models too; keep it in the
+        // child along with deep inspection for interactive builds.
+        if (!isolateValidation)
+        { var issues=Validate(p); if(issues.Count>0) throw new InvalidOperationException(string.Join(Environment.NewLine,issues)); }
+        var findings = isolateValidation
+            ? ValidationWorker.AnalyzeAsync(p, imageCore, progress, cancellation).GetAwaiter().GetResult()
+            : ProjectValidation.Analyze(p,imageCore,progress,cancellation);
+        var modelErrors=findings.Where(f=>f.Severity=="Error").ToList();
         if(modelErrors.Count>0)throw new BuildValidationException(modelErrors);
         var target=Path.GetFullPath(Path.Combine(parent,p.Collection+"-project"));
         var marker=Path.Combine(target,"Project","weft-build.json");
@@ -157,13 +172,14 @@ public static class PackBuilder
             var projectDir=Directory.CreateDirectory(Path.Combine(stage,"Project")).FullName;
             var assetsDir=Directory.CreateDirectory(Path.Combine(stage,"Assets")).FullName;
             var stream=Directory.CreateDirectory(Path.Combine(resource,"stream")).FullName;
-            List<string> metas=[];
             var core=File.Exists(p.CodeWalkerCorePath)?p.CodeWalkerCorePath:Path.Combine(AppContext.BaseDirectory,"CodeWalker.Core.dll");
             foreach(var ped in p.Items.Select(x=>x.Ped).Distinct())
             {
+                cancellation.ThrowIfCancellationRequested();
+                progress?.Report("Compiling collection metadata: " + ped);
                 var stem=ped+"_"+Dlc(p,ped);
                 File.WriteAllBytes(Path.Combine(stream,stem+".ymt"),CodeWalkerPreview.CompileMetadata(VariationXml(p,ped).ToString(),core));
-                var meta=stem+"_shop.meta";ShopXml(p,ped).Save(Path.Combine(resource,meta));metas.Add(meta);
+                if(!PackReplacement.IsReplacement(p))ShopXml(p,ped).Save(Path.Combine(resource,stem+"_shop.meta"));
                 foreach(var group in p.Items.Where(x=>x.Ped==ped).GroupBy(x=>x.Slot))
                 {
                     var drawableStream=options.GroupStreamByType
@@ -172,29 +188,27 @@ public static class PackBuilder
                     int n=0;
                     foreach(var a in group.OrderBy(x=>x.Drawable))
                     {
+                        cancellation.ThrowIfCancellationRequested();
+                        progress?.Report("Exporting clothing: " + a.Name);
                         var prefix=(a.IsProp?ped+"_p_"+Dlc(p,ped):stem)+"^";
                         var model=$"{a.Slot}_{n:000}"+(a.IsProp?"":"_"+Suffix(a));
                         File.Copy(a.ModelPath,Path.Combine(drawableStream,prefix+model+".ydd"));
                         if(a.FirstPersonPath.Length>0)File.Copy(a.FirstPersonPath,Path.Combine(drawableStream,prefix+model+"_1.ydd"));
                         if(a.PhysicsPath.Length>0)File.Copy(a.PhysicsPath,Path.Combine(drawableStream,prefix+model+".yld"));
-                        for(int t=0;t<a.TexturePaths.Count;t++)File.Copy(a.TexturePaths[t],Path.Combine(drawableStream,$"{prefix}{a.Slot}_diff_{n:000}_{(char)('a'+t)}"+(a.IsProp?"":"_"+Skin(a.TexturePaths[t]))+".ytd"));
+                        for(int t=0;t<a.TexturePaths.Count;t++){cancellation.ThrowIfCancellationRequested();File.Copy(a.TexturePaths[t],Path.Combine(drawableStream,$"{prefix}{a.Slot}_diff_{n:000}_{(char)('a'+t)}"+(a.IsProp?"":"_"+Skin(a.TexturePaths[t]))+".ytd"));}
                         n++;
                     }
                 }
             }
             var creatureName="mp_creaturemetadata_"+p.Collection+".ymt";
-            if(!p.SupplementalYmtPaths.Any(x=>Path.GetFileName(x).Equals(creatureName,StringComparison.OrdinalIgnoreCase)))
+            if(!PackReplacement.IsReplacement(p)&&!p.SupplementalYmtPaths.Any(x=>Path.GetFileName(x).Equals(creatureName,StringComparison.OrdinalIgnoreCase)))
             {
                 var creature=new XElement("CCreatureMetaData",A("shaderVariableComponents","CShaderVariableComponent"),A("pedPropExpressions","CPedPropExpressionData"),A("pedCompExpressions","CPedCompExpressionData"));
                 File.WriteAllBytes(Path.Combine(stream,creatureName),CodeWalkerPreview.CompileMetadata(creature.ToString(),core));
             }
             TattooBuilder.Export(p,resource,stream);
             foreach(var extra in p.SupplementalYmtPaths) File.Copy(extra,Path.Combine(stream,Path.GetFileName(extra)));
-            var manifest=new StringBuilder("-- Built with Duck Studio\nfx_version 'cerulean'\ngame 'gta5'\n\n");
-            foreach(var pair in new[]{("author",p.Author),("version",p.Version),("description",p.Description)})if(pair.Item2.Length>0)manifest.AppendLine($"{pair.Item1} '{ManifestValue(pair.Item2)}'");
-            manifest.AppendLine("\nfiles {");foreach(var m in metas)manifest.AppendLine($"    '{m}',");manifest.AppendLine("}");foreach(var m in metas)manifest.AppendLine($"data_file 'SHOP_PED_APPAREL_META_FILE' '{m}'");
-            if(p.Tattoos.Count>0) manifest.AppendLine($"files {{ '{TattooBuilder.Collection(p)}.xml', 'shop_tattoo.meta' }}\ndata_file 'PED_OVERLAY_FILE' '{TattooBuilder.Collection(p)}.xml'\ndata_file 'TATTOO_SHOP_DLC_FILE' 'shop_tattoo.meta'");
-            File.WriteAllText(Path.Combine(resource,"fxmanifest.lua"),manifest.ToString());
+            File.WriteAllText(Path.Combine(resource,"fxmanifest.lua"),Manifest(p));
             FiveMCompanion.WriteCatalog(p,resource);
             if(options.Target==BuildTarget.FiveM)FiveMCompanion.Export(p,Path.Combine(stage,"FiveM"));
             BuildTargets.Export(p,stage,resource,options.Target,core);
@@ -205,9 +219,11 @@ public static class PackBuilder
             var copied=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
             string BundleFile(string path)
             {
+                cancellation.ThrowIfCancellationRequested();
                 if(string.IsNullOrWhiteSpace(path)) return "";
                 var full=Path.GetFullPath(path);
                 if(copied.TryGetValue(full,out var existing)) return existing;
+                progress?.Report("Bundling source: " + Path.GetFileName(path));
                 var currentAssets=Path.Combine(target,"Assets")+Path.DirectorySeparatorChar;
                 var assetName=full.StartsWith(currentAssets,StringComparison.OrdinalIgnoreCase)
                     ? Path.GetFileName(path) : $"{copied.Count+1:0000}_{Path.GetFileName(path)}";
@@ -243,12 +259,26 @@ public static class PackBuilder
             ProjectIO.Save(portable,Path.Combine(projectDir,p.Collection+ProjectFiles.Extension));
             File.WriteAllText(Path.Combine(projectDir,"README.txt"),$"Deployment: {BuildTargets.OutputFolder(options.Target)}/{p.Collection}. See its target README for installation steps.\nOpen {p.Collection}{ProjectFiles.Extension} in Duck Studio to edit or rebuild; Assets contains the original input files, including linked tattoo artwork.\n");
             var backup=target+".weft-backup-"+Guid.NewGuid().ToString("N");
+            cancellation.ThrowIfCancellationRequested();
+            progress?.Report("Publishing the completed project...");
             if(Directory.Exists(target))Directory.Move(target,backup);
             try { Directory.Move(stage,target); } catch { if(Directory.Exists(backup))Directory.Move(backup,target);throw; }
             if(Directory.Exists(backup))Directory.Delete(backup,true);
             return target;
         }
         finally { if(Directory.Exists(stage))Directory.Delete(stage,true); }
+    }
+    // Add-on packs register their collection through shop meta. Replacement packs must not:
+    // registering a DLC's collection name again appends a second collection after every DLC
+    // instead of overriding the original, so they only stream files under the original names.
+    public static string Manifest(ClothingProject p)
+    {
+        var metas=PackReplacement.IsReplacement(p)?[]:p.Items.Select(x=>x.Ped).Distinct().Select(ped=>ped+"_"+Dlc(p,ped)+"_shop.meta").ToList();
+        var manifest=new StringBuilder("-- Built with Duck Studio\nfx_version 'cerulean'\ngame 'gta5'\n\n");
+        foreach(var pair in new[]{("author",p.Author),("version",p.Version),("description",p.Description)})if(pair.Item2.Length>0)manifest.AppendLine($"{pair.Item1} '{ManifestValue(pair.Item2)}'");
+        if(metas.Count>0){manifest.AppendLine("\nfiles {");foreach(var m in metas)manifest.AppendLine($"    '{m}',");manifest.AppendLine("}");foreach(var m in metas)manifest.AppendLine($"data_file 'SHOP_PED_APPAREL_META_FILE' '{m}'");}
+        if(p.Tattoos.Count>0) manifest.AppendLine($"files {{ '{TattooBuilder.Collection(p)}.xml', 'shop_tattoo.meta' }}\ndata_file 'PED_OVERLAY_FILE' '{TattooBuilder.Collection(p)}.xml'\ndata_file 'TATTOO_SHOP_DLC_FILE' 'shop_tattoo.meta'");
+        return manifest.ToString();
     }
     private static string ManifestValue(string s)=>s.Replace("\\","/").Replace("'"," ").Replace('\r',' ').Replace('\n',' ');
     public static void BuildZip(ClothingProject p,string path,BuildOptions? options=null)

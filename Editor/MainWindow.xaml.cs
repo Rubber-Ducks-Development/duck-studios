@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private string? projectPath;
     private ClothingAsset? selected;
     private bool syncing;
+    private bool buildBusy;
     private bool refreshingList;
     private ModelVisual3D? activeModel;
     private string? activeSceneFolder;
@@ -45,6 +46,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        PreviewMouseDown += BuildPreviewMouseDown;
+        PreviewTextInput += (_, e) => { if (buildCancellation != null) e.Handled = true; };
+        PreviewDragOver += (_, e) => { if (buildCancellation != null) { e.Effects = DragDropEffects.None; e.Handled = true; } };
+        PreviewDrop += (_, e) => { if (buildCancellation != null) e.Handled = true; };
         QuickFilterBox.SelectedIndex = 0;
         var findingsHeader = (StackPanel)IssueCount.Parent;
         findingsHeader.Children.Add(findingsScopeText);
@@ -86,7 +91,9 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private void SyncProject()
+    private void SyncProject() => SyncProjectFields(true);
+
+    private void SyncProjectFields(bool refreshList)
     {
         syncing = true;
         Title = $"Duck Studio - {project.Name}";
@@ -118,7 +125,7 @@ public partial class MainWindow : Window
         SupplementalButton.Visibility = imported ? Visibility.Collapsed : Visibility.Visible;
         ClearSupplementalButton.Visibility = imported ? Visibility.Collapsed : Visibility.Visible;
         syncing = false;
-        RefreshList();
+        if (refreshList) RefreshList();
     }
 
     private void RefreshList()
@@ -182,6 +189,7 @@ public partial class MainWindow : Window
 
     private void RefreshValidation()
     {
+        if (buildBusy) return;
         List<string>? focusedIssues = null;
         var issues = PackBuilder.Validate(project, (asset, assetIssues) =>
         {
@@ -629,33 +637,44 @@ public partial class MainWindow : Window
         SyncProject();
     }
 
-    private void BuildClick(object sender, RoutedEventArgs e) => BuildProject(false);
-
-    private void BuildProject(bool zipDefault)
+    private void BuildClick(object sender, RoutedEventArgs e)
     {
-        if (!EnsureProject()) return;
-        var dialog = new BuildWindow(project,zipDefault) { Owner = this };
-        if (dialog.ShowDialog() != true) return;
-        project.Collection = dialog.Collection; project.BuildTarget=dialog.Options.Target;
-        project.OutputFolder = dialog.OutputFolder;
-        SyncProject();
-        var issues = PackBuilder.Validate(project);
-        if (issues.Count > 0) { ShowBuildReport(new InvalidOperationException(string.Join("\n", issues))); return; }
+        if (buildCancellation != null) { CancelCurrentBuild(); return; }
+        BuildProject(false);
+    }
+
+    private async void BuildProject(bool zipDefault)
+    {
+        if (buildBusy || closePending) return;
+        buildBusy = true;
         try
         {
-            var path = PackBuilder.Build(project, dialog.OutputFolder, dialog.Options);
-            _ = RecordHistoryAsync("Built " + BuildTargets.Labels[(int)dialog.Options.Target]);
-            string zipNotice = "";
-            if(dialog.CreateZip)
-            {
-                var zipPath=Path.Combine(dialog.OutputFolder,project.Collection+"-project.zip");
-                if(File.Exists(zipPath)) zipPath=Path.Combine(dialog.OutputFolder,project.Collection+"-project-"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+".zip");
-                ZipFile.CreateFromDirectory(path,zipPath,CompressionLevel.Optimal,false);
-                zipNotice="\nZIP: "+zipPath;
-            }
-            MessageBox.Show($"Project exported at:\n{path}\n\nSee the build target README for deployment instructions.{zipNotice}", "Duck Studio", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (!EnsureProject()) return;
+            var dialog = new BuildWindow(project,zipDefault,settings.GtaFolderPath) { Owner = this };
+            if (dialog.ShowDialog() != true) return;
+            using var cancellation = new CancellationTokenSource();
+            buildCancellation = cancellation;
+            ShowCancelBuild();
+            StatusText.Text = "Waiting for current texture operations...";
+            // A timer callback already in flight must finish before taking the build snapshot.
+            while (textureImportBusy || textureReloadBusy) await Task.Delay(50,cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            project.Collection = dialog.Collection; project.BuildTarget=dialog.Options.Target;
+            project.PackMode = dialog.Mode; project.ReplaceDlc = dialog.ReplaceDlc;
+            project.ReplaceMaleCollection = dialog.ReplaceMale; project.ReplaceFemaleCollection = dialog.ReplaceFemale;
+            project.OutputFolder = dialog.OutputFolder;
+            SyncProjectFields(false);
+            ShowCancelBuild();
+            var progress = new Progress<string>(message => { if (buildBusy && !cancellation.IsCancellationRequested) StatusText.Text = message; });
+            var result = await PackBuildOperation.RunAsync(project, dialog.OutputFolder, dialog.Options, dialog.CreateZip, progress,cancellation.Token);
+            StatusText.Text = "Build complete: " + result.Folder;
+            await RecordHistoryAsync("Built " + BuildTargets.Labels[(int)dialog.Options.Target]);
+            var zipNotice = result.Zip == null ? "" : "\nZIP: " + result.Zip;
+            MessageBox.Show(this, $"Project exported at:\n{result.Folder}\n\nSee the build target README for deployment instructions.{zipNotice}", "Duck Studio", MessageBoxButton.OK, MessageBoxImage.Information);
         }
+        catch (OperationCanceledException) { StatusText.Text = "Build cancelled. Any completed export remains available."; }
         catch (Exception ex) { ShowBuildReport(ex); }
+        finally { buildCancellation = null; buildBusy = false; SyncProjectFields(false); }
     }
 
     private void ShowBuildReport(Exception error)
@@ -803,6 +822,7 @@ public partial class MainWindow : Window
 
     private void WindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (buildCancellation != null) { BuildPreviewKeyDown(sender, e); return; }
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (key == Key.Escape && !PanelDismissal.HasOpenDropdown(e.OriginalSource as DependencyObject))
         {

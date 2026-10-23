@@ -5,6 +5,7 @@ namespace DuckStudio;
 
 public static partial class CodeWalkerPreview
 {
+    public sealed record TextureInspection(int Textures, int LargestDimension, long PixelBytes, List<string> Names);
     private static void Set(object target, string property, object? value) => target.GetType().GetProperty(property)!.SetValue(target,value);
     private static object ReadYtd(string path,string coreDll)
     {
@@ -36,14 +37,21 @@ public static partial class CodeWalkerPreview
     }
     public static (int Textures,int LargestDimension,long PixelBytes) InspectTextures(string path,string coreDll)
     {
+        var result = InspectTextureDictionary(path, coreDll);
+        return (result.Textures, result.LargestDimension, result.PixelBytes);
+    }
+    public static TextureInspection InspectTextureDictionary(string path, string coreDll)
+    {
         var file=ReadYtd(path,coreDll);var textures=Textures(file);int largest=0;long bytes=0;
+        var names = new List<string>();
         foreach(var texture in textures)
         {
             if(texture==null)continue;
+            names.Add(Member(texture, "Name")?.ToString() ?? "");
             largest=Math.Max(largest,Math.Max(Convert.ToInt32(Member(texture,"Width")),Convert.ToInt32(Member(texture,"Height"))));
             if(Member(texture,"Data") is { } data && Member(data,"FullData") is byte[] raw)bytes+=raw.Length;
         }
-        return(textures.Length,largest,bytes);
+        return new(textures.Length,largest,bytes,names);
     }
     public static int OptimizeTextures(string source,string destination,string coreDll,int maxDimension,bool compress)
     {

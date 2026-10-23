@@ -17,7 +17,7 @@ public partial class MainWindow
     {
         textureReloadTimer.Tick += async (_, _) =>
         {
-            if (textureReloadBusy || textureImportBusy || textureReloadClosed || closePending) return;
+            if (textureReloadBusy || textureImportBusy || textureReloadClosed || closePending || buildBusy || !IsEnabled) return;
             var core = ResolveCorePath(false);
             if (core == null) return;
             textureReloadBusy = true;

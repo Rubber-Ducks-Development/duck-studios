@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using System.Xml.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -26,6 +27,16 @@ static class RealPreviewChecks
         using (var stream = File.Create(artwork)) encoder.Save(stream);
         var alternate = Path.Combine(folder, "task_diff_000_h_uni.ytd");
         var core = Path.Combine(AppContext.BaseDirectory, "CodeWalker.Core.dll");
+        var binary = CodeWalkerPreview.InspectClothing(model, core);
+        var legacy = System.Xml.Linq.XDocument.Parse(CodeWalkerPreview.ExportXmlFile(model, "", core));
+        var expected = ModelTools.Levels.Select(level =>
+        {
+            var meshes = legacy.Descendants(level).Descendants("Geometries").Elements("Item").ToList();
+            return new LodStatistics(level.Replace("DrawableModels", ""), meshes.Sum(m => ModelTools.Rows(m).Length), meshes.Sum(m => ModelTools.Indices(m).Length / 3), meshes.Count);
+        }).ToList();
+        check(binary.Model.Lods.SequenceEqual(expected), "Direct binary inspection preserves all XML-derived LOD vertex, triangle and mesh counts");
+        check(binary.Model.Bones == legacy.Descendants("Bones").Elements("Item").Count()
+            && binary.Model.HasWeights == legacy.Descendants("Layout").Elements("BlendWeights").Any(), "Direct binary inspection preserves skeleton and skin-weight findings");
         TextureImport.Convert(artwork, alternate, core, model, original);
         var bitmap = CodeWalkerPreview.LoadTextureFile(alternate, core)!;
         check(bitmap.PixelWidth == 64 && bitmap.PixelHeight == 64, "Real YTD variation H decodes at its original size");

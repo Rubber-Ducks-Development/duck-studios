@@ -128,6 +128,11 @@ public sealed class ClothingProject
     public string Name { get; set; } = "New clothing pack";
     public string HistoryId { get; set; } = "";
     public BuildTarget BuildTarget { get; set; } = BuildTarget.FiveM;
+    public PackMode PackMode { get; set; } = PackMode.Addon;
+    // Replaced game DLC pack (e.g. mpheist), shown for reference only.
+    public string ReplaceDlc { get; set; } = "";
+    public string ReplaceMaleCollection { get; set; } = "";
+    public string ReplaceFemaleCollection { get; set; } = "";
     public List<TattooAsset> Tattoos { get; set; } = [];
     public string Collection { get; set; } = "my_clothes";
     public string Author { get; set; } = "";

@@ -109,7 +109,7 @@ public static class ProjectComparison
     {
         var changes=new List<ProjectDifference>();
         void Change(string item,string field,object? old,object? next){if(!Equals(old,next))changes.Add(new(item,field,old?.ToString()??"",next?.ToString()??""));}
-        foreach(var property in new[]{"Name","Collection","Author","Version","Description","BuildTarget"})Change("Project",property,typeof(ClothingProject).GetProperty(property)!.GetValue(before),typeof(ClothingProject).GetProperty(property)!.GetValue(after));
+        foreach(var property in new[]{"Name","Collection","Author","Version","Description","BuildTarget","PackMode","ReplaceDlc","ReplaceMaleCollection","ReplaceFemaleCollection"})Change("Project",property,typeof(ClothingProject).GetProperty(property)!.GetValue(before),typeof(ClothingProject).GetProperty(property)!.GetValue(after));
         string Content(string path)=>File.Exists(path)?Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))):"missing";
         string FileDescription(string path)=>File.Exists(path)?$"{Path.GetFileName(path)} ({new FileInfo(path).Length:N0} bytes)":"Missing: "+path;
         void FileChange(string name,string field,string old,string next){if(Content(old)!=Content(next))Change(name,field,FileDescription(old),FileDescription(next));}

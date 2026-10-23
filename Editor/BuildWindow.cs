@@ -18,12 +18,28 @@ public sealed class BuildWindow : Window
     public string OutputFolder => outputBox.Text.Trim();
     public bool CreateZip => zipBox.IsChecked == true;
     public PackBuilder.BuildOptions Options => new(groupedBox.IsChecked == true, (BuildTarget)platform.SelectedIndex);
+    private readonly ComboBox modeBox;
+    private readonly ComboBox dlcBox;
+    private readonly TextBox maleBox;
+    private readonly TextBox femaleBox;
+    public PackMode Mode => (PackMode)Math.Max(0, modeBox.SelectedIndex);
+    public string ReplaceDlc => Mode == PackMode.ReplaceDlc ? (dlcBox.SelectedItem as DlcCollection)?.Pack ?? "" : "";
+    public string ReplaceMale => Mode == PackMode.Addon ? "" : maleBox.Text.Trim().ToLowerInvariant();
+    public string ReplaceFemale => Mode == PackMode.Addon ? "" : femaleBox.Text.Trim().ToLowerInvariant();
+    private CancellationTokenSource? scanCancellation;
+    private bool scanClosed, scanStopped;
 
-    public BuildWindow(ClothingProject project, bool zipDefault = false)
+    private void StopScan()
+    {
+        scanStopped = true;
+        scanCancellation?.Cancel();
+    }
+
+    public BuildWindow(ClothingProject project, bool zipDefault = false, string gtaFolder = "")
     {
         Title = "Duck Studio - Build Project";
         Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/DuckStudio;component/Assets/AppIconSource.png"));
-        Width = 510; Height = 590; MinWidth = 480; MinHeight = 530;
+        Width = 520; Height = 720; MinWidth = 480; MinHeight = 530;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         Background = Brush("#303032"); Foreground = Brushes.White;
@@ -38,6 +54,11 @@ public sealed class BuildWindow : Window
         {
             if (!Regex.IsMatch(Collection, "^[a-z][a-z0-9_]{1,30}$"))
             { MessageBox.Show(this, "Collection name must be 2 to 31 lowercase letters, digits or underscores and start with a letter.", "Check collection name"); collectionBox!.Focus(); return; }
+            var check = new ClothingProject { PackMode = Mode, ReplaceMaleCollection = ReplaceMale, ReplaceFemaleCollection = ReplaceFemale, Items = project.Items };
+            if (PackReplacement.TargetIssue(check, (BuildTarget)platform!.SelectedIndex) is { } targetIssue)
+            { MessageBox.Show(this, targetIssue, "Check pack mode"); platform.Focus(); return; }
+            if (PackReplacement.Validate(check).FirstOrDefault() is { } replaceIssue)
+            { MessageBox.Show(this, replaceIssue, "Check pack mode"); modeBox!.Focus(); return; }
             if (!Directory.Exists(OutputFolder))
             { MessageBox.Show(this, "Choose an existing output folder.", "Check output folder"); outputBox!.Focus(); return; }
             DialogResult = true;
@@ -54,6 +75,70 @@ public sealed class BuildWindow : Window
         foreach(var label in BuildTargets.Labels) platform.Items.Add(label); platform.SelectedIndex=(int)project.BuildTarget; body.Children.Add(platform);
         body.Children.Add(Label("Clothes collection name"));
         collectionBox = Box(project.Collection); collectionBox.Margin = new Thickness(0, 6, 0, 18); body.Children.Add(collectionBox);
+        body.Children.Add(Label("Pack mode (advanced)"));
+        modeBox = new ComboBox { Height = 30, Margin = new Thickness(0, 6, 0, 8), Background = Brush("#4B4B4D"), Foreground = Brushes.White };
+        foreach (var label in PackReplacement.Labels) modeBox.Items.Add(label);
+        body.Children.Add(modeBox);
+        var replacePanel = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+        body.Children.Add(replacePanel);
+        var dlcRow = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+        var scan = Button("Scan GTA", 90); scan.Margin = new Thickness(6, 0, 0, 0); scan.ToolTip = "Refresh the clothing DLC list, or stop the current scan";
+        DockPanel.SetDock(scan, Dock.Right); dlcRow.Children.Add(scan);
+        dlcBox = new ComboBox { Height = 30, Background = Brush("#4B4B4D"), Foreground = Brushes.White };
+        System.Windows.Automation.AutomationProperties.SetName(dlcBox, "DLC to replace");
+        dlcRow.Children.Add(dlcBox); replacePanel.Children.Add(dlcRow);
+        var dlcStatus = new TextBlock { Foreground = Brush("#BDBDBD"), FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
+        replacePanel.Children.Add(dlcStatus);
+        var names = new Grid(); names.ColumnDefinitions.Add(new ColumnDefinition()); names.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) }); names.ColumnDefinitions.Add(new ColumnDefinition());
+        var malePanel = new StackPanel(); malePanel.Children.Add(Label("Male collection")); maleBox = Box(project.ReplaceMaleCollection); maleBox.Margin = new Thickness(0, 4, 0, 0); malePanel.Children.Add(maleBox); names.Children.Add(malePanel);
+        var femalePanel = new StackPanel(); femalePanel.Children.Add(Label("Female collection")); femaleBox = Box(project.ReplaceFemaleCollection); femaleBox.Margin = new Thickness(0, 4, 0, 0); femalePanel.Children.Add(femaleBox); Grid.SetColumn(femalePanel, 2); names.Children.Add(femalePanel);
+        replacePanel.Children.Add(names);
+        replacePanel.Children.Add(new TextBlock { Text = "A replacement pack takes over the complete collection, not single items: your clothing becomes drawables 0, 1, 2... of that collection, and the original items are no longer available. Deploy the whole resource and test each gender on your server's game build.", Foreground = Brush("#E3C27A"), FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) });
+        void ShowDlcs(List<DlcCollection> list, string? keep)
+        {
+            dlcBox.Items.Clear(); foreach (var dlc in list) dlcBox.Items.Add(dlc);
+            dlcBox.SelectedItem = list.FirstOrDefault(x => x.Pack == keep) ?? list.FirstOrDefault(x => x.Male == maleBox.Text.Trim() && x.Female == femaleBox.Text.Trim());
+            dlcStatus.Text = list.Count == 0 ? "No freemode clothing collections were found in this installation." : $"{list.Count} clothing collections in {gtaFolder}.";
+        }
+        async Task Scan(bool forceRefresh = false)
+        {
+            if (scanCancellation != null || scanClosed) return;
+            if (!File.Exists(Path.Combine(gtaFolder, "GTA5.exe"))) { dlcStatus.Text = "Link GTA5.exe in Settings to list your DLCs, or use a custom collection."; return; }
+            using var active = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+            scanCancellation = active; scanStopped = false;
+            scan.Content = "Stop scan"; dlcStatus.Text = "Reading DLC packs from GTA V...";
+            var progress = new Progress<string>(message =>
+            {
+                if (!scanClosed && !active.IsCancellationRequested && ReferenceEquals(scanCancellation, active)) dlcStatus.Text = message;
+            });
+            try
+            {
+                var list = await PackReplacement.ScanAsync(gtaFolder, active.Token, progress, forceRefresh);
+                if (!scanClosed && !active.IsCancellationRequested && Mode == PackMode.ReplaceDlc) ShowDlcs(list, project.ReplaceDlc);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!scanClosed) dlcStatus.Text = scanStopped ? "DLC scan stopped. Click Scan GTA to try again." : "DLC scan timed out after five minutes. Check the game folder and try again.";
+            }
+            catch (Exception ex) { if (!scanClosed) dlcStatus.Text = ex.Message; }
+            finally { scanCancellation = null; if (!scanClosed) scan.Content = "Scan GTA"; }
+        }
+        scan.Click += async (_, _) => { if (scanCancellation != null) StopScan(); else await Scan(true); };
+        dlcBox.SelectionChanged += (_, _) => { if (Mode == PackMode.ReplaceDlc && dlcBox.SelectedItem is DlcCollection dlc) { maleBox.Text = dlc.Male; femaleBox.Text = dlc.Female; } };
+        void DescribeMode()
+        {
+            replacePanel.Visibility = Mode == PackMode.Addon ? Visibility.Collapsed : Visibility.Visible;
+            dlcRow.Visibility = dlcStatus.Visibility = Mode == PackMode.ReplaceDlc ? Visibility.Visible : Visibility.Collapsed;
+            maleBox.IsReadOnly = femaleBox.IsReadOnly = Mode == PackMode.ReplaceDlc;
+            if (Mode != PackMode.ReplaceDlc) StopScan();
+            if (Mode == PackMode.ReplaceDlc && dlcBox.Items.Count == 0)
+            {
+                _ = Scan();
+            }
+        }
+        Closed += (_, _) => { scanClosed = true; StopScan(); };
+        modeBox.SelectionChanged += (_, _) => DescribeMode();
+        modeBox.SelectedIndex = (int)project.PackMode;
         body.Children.Add(Label("Extra options"));
         groupedBox = Check("Create stream subfolders for each drawable type", true); body.Children.Add(groupedBox);
         zipBox = Check("Also create a ZIP of the three-folder project", zipDefault); body.Children.Add(zipBox);

@@ -11,8 +11,11 @@ public sealed record ValidationFinding(string Severity,string AssetId,string Ite
 }
 public static class ProjectValidation
 {
-    public static List<ValidationFinding> Analyze(ClothingProject project,string core)
+    public static List<ValidationFinding> Analyze(ClothingProject project,string core,IProgress<string>? progress=null,CancellationToken cancellation=default,bool trimMemory=false)
     {
+        cancellation.ThrowIfCancellationRequested();
+        var models = new Dictionary<string, ClothingInspection>(StringComparer.OrdinalIgnoreCase);
+        var textures = new Dictionary<string, CodeWalkerPreview.TextureInspection>(StringComparer.OrdinalIgnoreCase);
         var findings=new List<ValidationFinding>();
         var basic=PackBuilder.Validate(project,(asset,issues)=>{foreach(var issue in issues)findings.Add(new("Error",asset.Id,asset.Name,issue,"Select this item and attach a valid model or texture, or correct its properties."));});
         foreach(var issue in basic.Where(x=>!findings.Any(f=>f.Problem==x)))findings.Add(new("Error","","Project",issue,"Correct project settings or tattoo properties before building."));
@@ -20,21 +23,28 @@ public static class ProjectValidation
             foreach(var item in group)findings.Add(new("Warning",item.Id,item.Name,"Multiple items share this drawable position.","Use Batch editing to assign distinct positions. Export order is sorted by position."));
         foreach(var group in project.Items.GroupBy(x=>x.Name,StringComparer.OrdinalIgnoreCase).Where(g=>g.Count()>1))
             foreach(var item in group)findings.Add(new("Warning",item.Id,item.Name,"Repeated display name makes the pack harder to identify.","Rename this item or use a batch naming pattern."));
+        var position = 0;
         foreach(var item in project.Items)
         {
+            cancellation.ThrowIfCancellationRequested();
+            progress?.Report($"Validating model {++position}/{project.Items.Count}: {item.Name}");
             if(!File.Exists(item.ModelPath))continue;
             try
             {
-                var model=CodeWalkerPreview.InspectModel(item.ModelPath,core);
-                var embedded=CodeWalkerPreview.EmbeddedTextureNames(item.ModelPath,core);
-                var auxiliary=CodeWalkerPreview.AuxiliaryTextureNames(item.ModelPath,core);
+                if (!models.TryGetValue(item.ModelPath, out var inspection)) models[item.ModelPath] = inspection = CodeWalkerPreview.InspectClothing(item.ModelPath, core);
+                var model=inspection.Model;
+                var embedded=inspection.EmbeddedNames;
+                var auxiliary=inspection.AuxiliaryNames;
                 foreach(var lod in model.Lods.Skip(1).Where(x=>x.Triangles==0))findings.Add(new("Warning",item.Id,item.Name,$"Missing {lod.Level} LOD.","Inspect the model or generate conservative LOD copies in Model optimization."));
                 if(model.Lods[0].Triangles>30000)findings.Add(new("Warning",item.Id,item.Name,$"High LOD contains {model.Lods[0].Triangles:N0} triangles.","Inspect your geometry budget and lower LODs before deploying."));
                 foreach(var path in item.TexturePaths.Where(File.Exists))
                 {
+                    cancellation.ThrowIfCancellationRequested();
+                    progress?.Report($"Validating textures {position}/{project.Items.Count}: {Path.GetFileName(path)}");
                     try
                     {
-                        var stats=CodeWalkerPreview.InspectTextures(path,core);var external=CodeWalkerPreview.TextureNames(path,core);var names=external.Concat(embedded).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                        if (!textures.TryGetValue(path, out var stats)) textures[path] = stats = CodeWalkerPreview.InspectTextureDictionary(path, core);
+                        var external=stats.Names;var names=external.Concat(embedded).ToHashSet(StringComparer.OrdinalIgnoreCase);
                         // Clothing variations may carry a custom-named diffuse override.
                         // An unambiguous color map satisfies every DiffuseSampler, just
                         // as a streamed PED variation does in CodeWalker's renderer.
@@ -43,10 +53,19 @@ public static class ProjectValidation
                         if(stats.LargestDimension>2048)findings.Add(new("Warning",item.Id,item.Name,$"{Path.GetFileName(path)} has a {stats.LargestDimension}px texture.","Use the texture optimizer if this resolution is unnecessary."));
                         if(stats.Textures==0)findings.Add(new("Error",item.Id,item.Name,"Empty texture dictionary: "+Path.GetFileName(path),"Replace the dictionary with a valid texture."));
                     }
+                    catch(OperationCanceledException) { throw; }
                     catch(Exception ex){findings.Add(new("Error",item.Id,item.Name,"Unreadable texture: "+Path.GetFileName(path)+". "+(ex.InnerException??ex).Message,"Replace or re-export the texture dictionary."));}
                 }
             }
+            catch(OperationCanceledException) { throw; }
             catch(Exception ex){findings.Add(new("Error",item.Id,item.Name,"Unreadable model: "+(ex.InnerException??ex).Message,"Replace or re-export this YDD."));}
+            finally
+            {
+                // Only enabled in the isolated worker. Collecting its temporary native
+                // resource buffers cannot suspend the editor's dispatcher or rendering.
+                if (trimMemory && GC.GetTotalMemory(false) > 128L * 1024 * 1024)
+                    GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true, true);
+            }
         }
         foreach(var outfit in project.Outfits)
             foreach(var entry in outfit.Entries.Where(x=>!string.IsNullOrEmpty(x.AssetId)))
@@ -54,6 +73,7 @@ public static class ProjectValidation
                 var asset=project.Items.FirstOrDefault(x=>x.Id==entry.AssetId);
                 if(asset==null||asset.Ped!=outfit.Ped||asset.Slot!=entry.Slot || entry.Texture<0 || entry.Texture>=Math.Max(1,asset.TexturePaths.Count))findings.Add(new("Warning",entry.AssetId,outfit.Name,"Outfit contains a missing or incompatible item/variation.","Open Outfit builder and update this preset."));
             }
+        cancellation.ThrowIfCancellationRequested();
         return findings;
     }
 }
@@ -73,8 +93,12 @@ public static partial class CodeWalkerPreview
     public static List<string> EmbeddedTextureNames(string path,string coreDll)
     {
         EnsureCore(coreDll);var type=core!.GetType("CodeWalker.GameFiles.YddFile",true)!;var file=Activator.CreateInstance(type)!;type.GetMethod("Load",[typeof(byte[])])!.Invoke(file,[File.ReadAllBytes(path)]);
+        return Member(file, "Drawables") is Array drawables ? EmbeddedTextureNames(drawables) : [];
+    }
+    private static List<string> EmbeddedTextureNames(Array drawables)
+    {
         var result=new List<string>();
-        if(Member(file,"Drawables") is Array drawables)foreach(var drawable in drawables)
+        foreach(var drawable in drawables)
             if(drawable!=null && Member(drawable,"ShaderGroup") is {} shaders && Member(shaders,"TextureDictionary") is {} dict && Member(dict,"Textures") is {} entries && Member(entries,"data_items") is Array textures)
                 result.AddRange(textures.Cast<object>().Select(t=>Member(t,"Name")?.ToString()??""));
         return result;

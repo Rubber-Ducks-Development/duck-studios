@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.1.13
+
+### Build and DLC scan responsiveness
+
+- Fix the remaining validation stall on large clothing packs. Inspect binary geometry buffers directly instead of expanding every vertex into XML, and read each model/texture once per validation pass.
+- Isolate model validation in a headless child process with per-item progress and a two-minute timeout, so native decoding and garbage collection cannot suspend the editor's renderer.
+- Keep editor rendering enabled while builds run. Block editing input, offer Cancel build and Escape, terminate the validation worker on cancellation, and remove incomplete ZIPs without replacing previous complete archives.
+- Run build validation, artwork conversion, file export and optional ZIP compression on a background worker, with build phase and file status in the footer.
+- Use independent build textures so builds preserve the editor's working files; pause live reload, undo checkpoints and automatic backup starts during the operation.
+- Stop DLC scans when their dialog closes or the pack mode changes, offer Stop scan, and show elapsed time with a five-minute timeout. Serialize reader shutdown/startup to prevent overlapping scans after reopening the dialog.
+- Cache successful DLC discovery across app launches, invalidating it when the game executable, file reader or DLC archive inventory changes. Scan GTA explicitly refreshes the cache.
+- Add generated-fixture regressions for background build responsiveness, texture preservation, failure recovery, ZIP output, reader cancellation and cache invalidation.
+- Allow the DIB/TIF aliases for the already supported BMP/TIFF image modules so Magick.NET's format lookup can initialize during artwork conversion. Script-capable formats and external delegates remain blocked.
+- Update rustls-webpki, webpki-roots, webpki-root-certs and Tokio to address newly reported certificate-validation and I/O-safety advisories, and rebuild the bundled reader.
+- Copy the bundled decoder, reader and their notices into source-build and test output folders automatically, including clean CI builds.
+
+### Replacement packs
+
+- Add Pack mode to Build Project: Add-on (default), Replace a GTA DLC collection and Replace a custom collection.
+- Replace a GTA DLC lists the freemode clothing collections in the linked GTA V installation (for example mpheist: mp_m_heist / mp_f_heist), read from each pack's own YMT names. Picking one builds the project's clothing as that collection's drawables, YMT and shop meta.
+- Replace a custom collection takes male and female collection names, for packs from other resources.
+- Replacement builds stream only the YMT, models and textures under the original names, without shop meta, creature metadata or `SHOP_PED_APPAREL_META_FILE` entries. Registering the DLC's name again added a second collection at the end of every clothing list instead of replacing the original.
+- Validation requires a collection for each gender in the pack and rejects cross-gender or duplicate names. Replacement packs build for FiveM and raw game assets; alt:V and single-player builds are refused with an explanation. Pack mode is saved with the project and shown in revision comparison.
+
 ## 2.1.12
 
 - Preserve imported YTD dictionary lookup keys and keep the edited diffuse first instead of re-sorting entries by display-name hash. Previously an edited variation could export an auxiliary/template entry ahead of its intended color texture even though the preview displayed the edit.

@@ -19,7 +19,7 @@ public partial class MainWindow
     }
     private void CaptureEdit()
     {
-        if(editRestoring||syncing||textureImportBusy||textureReloadBusy||closePending)return;
+        if(editRestoring||syncing||textureImportBusy||textureReloadBusy||closePending||buildBusy||!IsEnabled)return;
         try{edits.Observe(project);UndoMenu.IsEnabled=edits.CanUndo;RedoMenu.IsEnabled=edits.CanRedo;}
         catch(Exception ex){StatusText.ToolTip="Undo checkpoint could not be captured: "+ex.Message;}
     }

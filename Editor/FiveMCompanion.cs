@@ -8,7 +8,7 @@ public sealed record GameOutfit(string id,string name,string ped,List<GameOutfit
 public static class FiveMCompanion
 {
     public static int Component(string slot)=>slot switch{"p_head"=>0,"p_eyes"=>1,"p_ears"=>2,"p_lwrist"=>6,"p_rwrist"=>7,_=>Array.IndexOf(ProjectIO.Slots,slot)};
-    public static string Collection(ClothingProject p,string ped)=>(ped.Contains("mp_f_")?"mp_f_":"mp_m_")+p.Collection;
+    public static string Collection(ClothingProject p,string ped)=>PackReplacement.Collection(p,ped);
     public static int LocalIndex(ClothingProject p,ClothingAsset asset)=>p.Items.Where(x=>x.Ped==asset.Ped&&x.Slot==asset.Slot).OrderBy(x=>x.Drawable).ToList().FindIndex(x=>x.Id==asset.Id);
     public static List<GameOutfit> Outfits(ClothingProject p)=>p.Outfits.Select(o=>new GameOutfit(o.Id,o.Name,o.Ped,o.Entries.Select(e=>
     {

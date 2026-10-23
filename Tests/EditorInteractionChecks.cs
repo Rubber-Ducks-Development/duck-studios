@@ -53,6 +53,22 @@ static class EditorInteractionChecks
         typeof(MainWindow).GetField("selected", Private)!.SetValue(window, male);
         Call(window, "RefreshList"); Call(window, "SyncItem");
         var textures = (ListBox)window.FindName("TextureList");
+        using (var buildStop = new CancellationTokenSource())
+        {
+            typeof(MainWindow).GetField("buildCancellation", Private)!.SetValue(window, buildStop);
+            typeof(MainWindow).GetField("buildBusy", Private)!.SetValue(window, true);
+            Call(window, "ShowCancelBuild");
+            check(window.IsEnabled && textures.IsEnabled && ((Button)window.FindName("BuildButton")).IsEnabled,
+                "Build mode keeps the window and list rendering enabled with an active Cancel build button");
+            var mouse = new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent };
+            Call(window, "BuildPreviewMouseDown", window, mouse);
+            check(mouse.Handled, "Build mode blocks editor mouse input while keeping the window enabled");
+            Call(window, "BuildClick", window, new RoutedEventArgs());
+            check(buildStop.IsCancellationRequested, "The build button cancels an active build without opening another dialog");
+            typeof(MainWindow).GetField("buildCancellation", Private)!.SetValue(window, null);
+            typeof(MainWindow).GetField("buildBusy", Private)!.SetValue(window, false);
+            Call(window, "SyncProject");
+        }
         var variations = (ComboBox)window.FindName("PreviewTextureBox");
         textures.SelectedIndex = 7;
         check(variations.SelectedIndex == 7, "Selecting texture H synchronizes the 3D preview selection");

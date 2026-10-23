@@ -110,7 +110,7 @@ public partial class MainWindow
     }
     private async Task CheckUpdatesAsync(bool manual)
     {
-        if(updateChecking||closePending||textureReloadClosed)return;
+        if(updateChecking||closePending||textureReloadClosed||buildBusy)return;
         var feed=ApplicationUpdates.ResolveFeed(settings);
         if(string.IsNullOrWhiteSpace(feed)){if(manual){MessageBox.Show(this,"Choose an update feed in Help > Update settings. The release folder also includes a local signed feed.","Update feed needed");UpdateSettingsClick(this,new RoutedEventArgs());}return;}
         updateChecking=true;

@@ -2,7 +2,7 @@
 
 ## Supported version
 
-Use the latest 2.1.x release, currently 2.1.3. Earlier versions should be updated before opening projects supplied by other people. Security fixes are released through this repository's Releases page and signed update feed.
+Use the latest 2.1.x release, currently 2.1.13. Earlier versions should be updated before opening projects supplied by other people. Security fixes are released through this repository's Releases page and signed update feed.
 
 ## Report a vulnerability privately
 
@@ -25,5 +25,7 @@ Before publishing, run the source and security regression tests, Gitleaks agains
 The publication review found no exposed credentials in Git history or the release scan. The signing key was not published. This is a targeted review, not a penetration test or a guarantee that every input parser is free of bugs. Native image, model and archive parsers remain an attack surface; use trusted assets and keep the app updated.
 
 RustSec still reports maintenance warnings for the upstream `json` and `paste` crates. These are recorded as dependency maintenance risks, not treated as proof of safety. The confirmed ruzstd advisory was fixed by upgrading to 0.9.1. Studio 2.1.3 also upgrades rustls to 0.23.46 for RUSTSEC-2026-0346 through RUSTSEC-2026-0349.
+
+Studio 2.1.13 updates rustls-webpki to 0.103.16 and webpki-roots/webpki-root-certs to 1.0.10 for RUSTSEC-2026-0381 through RUSTSEC-2026-0383, and Tokio to 1.53.3 for RUSTSEC-2026-0386. Build model validation is isolated in a cancellable worker with a bounded lifetime; native parsers still require trusted inputs and current dependencies.
 
 EXEs currently have no Authenticode publisher certificate. Update-feed signatures protect the updater; they do not replace Windows publisher signing or verification of the first downloaded installer.

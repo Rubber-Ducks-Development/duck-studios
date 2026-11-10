@@ -46,7 +46,7 @@ version = "0.8"
 version = "1.0"
 
 [dependencies.cipher]
-version = "0.4"
+version = "0.5"
 
 [dependencies.flate2]
 version = "1.0"

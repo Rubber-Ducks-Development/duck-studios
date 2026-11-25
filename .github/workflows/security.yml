@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@2f920dad77d7f4f2ea876b66287b896de40dda79
+      - uses: actions/dependency-review-action@789feb0d345fabae66e2f42aa6c3e49ff814c35a
         with:
           fail-on-severity: low
   rust-advisories:
